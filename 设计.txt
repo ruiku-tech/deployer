@@ -1,0 +1,11 @@
+file: 文件，比如前端文件和后端部署文件
+
+host: {名字:'host,password'}
+
+config: nginx配置，服务端配置
+
+script: 部署模版脚本，比如上传，执行
+put: [CONF:名字],路径
+run: [HOST:192.148.0.1] [FILE:aaa]'
+
+bat: 服务器，脚本列表
