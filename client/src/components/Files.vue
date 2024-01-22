@@ -12,10 +12,10 @@
         </div>
       </template>
       <el-table :data="list" style="width: 100%">
-        <el-table-column prop="file" label="文件名" width="400" />
+        <el-table-column prop="file" label="文件名" />
         <el-table-column label="操作" width="120">
-          <template #default>
-            <el-button link type="primary" size="small" @click="delFile"
+          <template #default="scope">
+            <el-button link type="primary" size="small" @click="delFile(scope.row)"
               >删除</el-button
             >
           </template>
@@ -28,6 +28,7 @@
 <script>
 import { ElMessage } from "element-plus";
 import { fetchFiles, deleteFile, uploadFile } from "../api";
+import { confirmDelete } from "../utils";
 
 export default {
   name: "files",
@@ -54,7 +55,9 @@ export default {
       }
     },
     delFile(item) {
-      deleteFile(item.file).then(this.fresh);
+      confirmDelete().then(() => {
+        deleteFile(item.file).then(this.fresh);
+      });
     },
   },
 };

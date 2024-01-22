@@ -1,6 +1,6 @@
 <template>
   <div>
-    <el-collapse>
+    <el-collapse v-model="collapse">
       <el-collapse-item title="点击新增" name="1">
         <div class="panel">
           <el-form ref="formRef" :model="form" label-width="120px">
@@ -29,15 +29,15 @@
         </div>
       </template>
       <el-table :data="list" style="width: 100%">
-        <el-table-column prop="name" label="名字" width="120" />
-        <el-table-column prop="host" label="IP" width="120" />
-        <el-table-column prop="password" label="密码" width="120" />
+        <el-table-column prop="name" label="名字"/>
+        <el-table-column prop="host" label="IP" width="200" />
+        <el-table-column prop="password" label="密码" width="200" />
         <el-table-column label="操作" width="120">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="edit(scope.row)"
               >修改</el-button
             >
-            <el-button link type="primary" size="small" @click="del"
+            <el-button link type="primary" size="small" @click="del(scope.row)"
               >删除</el-button
             >
           </template>
@@ -50,6 +50,7 @@
 <script>
 import { fetchHosts, saveHosts } from "../api";
 import { ElMessage } from "element-plus";
+import { confirmDelete } from "../utils";
 
 export default {
   name: "host",
@@ -61,6 +62,7 @@ export default {
         host: "",
         password: "",
       },
+      collapse:[]
     };
   },
   mounted() {
@@ -76,15 +78,18 @@ export default {
       });
     },
     del(item) {
-      const list = this.list.filter((the) => {
-        return the.name !== item.name;
+      confirmDelete().then(() => {
+        const list = this.list.filter((the) => {
+          return the.name !== item.name;
+        });
+        this.requestSave(list);
       });
-      this.requestSave(list);
     },
     edit(item) {
       this.form.name = item.name;
       this.form.host = item.host;
       this.form.password = item.password;
+      this.collapse = ['1']
     },
     save() {
       if (!this.form.name) {

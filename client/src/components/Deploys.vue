@@ -1,6 +1,6 @@
 <template>
   <div>
-    <el-collapse>
+    <el-collapse v-model="collapse">
       <el-collapse-item title="点击新增" name="1">
         <div class="panel">
           <el-form ref="formRef" :model="form" label-width="120px">
@@ -65,18 +65,30 @@
         </div>
       </template>
       <el-table
-        :data="list"
+        :data="finalList"
         style="width: 100%"
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="name" label="脚本名字" width="300" />
+        <el-table-column prop="name" label="脚本名字">
+          <template #header>
+            <div class="header-with-filter">
+              <span>脚本名字</span>
+              <el-input
+                class="filter-input"
+                v-model="filterKey"
+                size="small"
+                placeholder="过滤"
+              />
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120">
-          <template #default>
-            <el-button link type="primary" size="small" @click="edit"
+          <template #default="scope">
+            <el-button link type="primary" size="small" @click="edit(scope.row)"
               >修改</el-button
             >
-            <el-button link type="primary" size="small" @click="del"
+            <el-button link type="primary" size="small" @click="del(scope.row)"
               >删除</el-button
             >
           </template>
@@ -100,6 +112,7 @@ import {
   saveBat,
 } from "../api";
 import DeployConfirm from "./DeployConfirm.vue";
+import { confirmDelete } from "../utils";
 
 export default {
   name: "deploys",
@@ -116,7 +129,17 @@ export default {
       },
       selected: [],
       deploying: false,
+      collapse: [],
+      filterKey: "",
     };
+  },
+  computed:{
+    finalList(){
+      if(this.filterKey){
+        return this.list.filter(item=>item.name.includes(this.filterKey))
+      }
+      return this.list
+    }
   },
   mounted() {
     this.fresh();
@@ -142,15 +165,18 @@ export default {
       });
     },
     del(item) {
-      deleteBat(item.name).then(this.fresh);
+      confirmDelete().then(() => {
+        deleteBat(item.name).then(this.fresh);
+      });
     },
     edit(item) {
       fetchBat(item.name).then((data) => {
         this.form.name = item.name;
         const arr = data.split("\n");
         this.form.host = arr[0];
-        this.cmds = arr.slice(1).map((value) => ({ value }));
+        this.form.cmds = arr.slice(1).map((value) => ({ value }));
       });
+      this.collapse = ["1"];
     },
     save() {
       if (!this.form.name) {
@@ -167,6 +193,7 @@ export default {
       saveBat(this.form.name, arr.join("\n")).then(this.fresh).then(this.reset);
     },
     reset() {
+      this.form.cmds = [];
       this.$refs.formRef.resetFields();
     },
     addCmd() {
@@ -193,4 +220,12 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
+.header-with-filter {
+  display: flex;
+  flex-direction: row;
+}
+.filter-input {
+  flex: 1;
+  margin-left: 10px;
+}
 </style>

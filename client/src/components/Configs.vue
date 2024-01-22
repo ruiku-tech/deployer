@@ -1,6 +1,6 @@
 <template>
   <div>
-    <el-collapse>
+    <el-collapse v-model="collapse">
       <el-collapse-item title="点击新增" name="1">
         <div class="panel">
           <el-alert
@@ -35,13 +35,13 @@
         </div>
       </template>
       <el-table :data="list" style="width: 100%">
-        <el-table-column prop="name" label="配置名字" width="300" />
+        <el-table-column prop="name" label="配置名字" />
         <el-table-column label="操作" width="120">
-          <template #default>
-            <el-button link type="primary" size="small" @click="edit"
+          <template #default="scope">
+            <el-button link type="primary" size="small" @click="edit(scope.row)"
               >修改</el-button
             >
-            <el-button link type="primary" size="small" @click="del"
+            <el-button link type="primary" size="small" @click="del(scope.row)"
               >删除</el-button
             >
           </template>
@@ -54,6 +54,7 @@
 <script>
 import { ElMessage } from "element-plus";
 import { deleteConfig, fetchConfig, fetchConfigs, saveConfig } from "../api";
+import { confirmDelete } from "../utils";
 export default {
   name: "configs",
   data() {
@@ -63,6 +64,7 @@ export default {
         name: "",
         data: "",
       },
+      collapse: [],
     };
   },
   mounted() {
@@ -75,13 +77,16 @@ export default {
       });
     },
     del(item) {
-      deleteConfig(item.name).then(this.fresh);
+      confirmDelete().then(() => {
+        deleteConfig(item.name).then(this.fresh);
+      });
     },
     edit(item) {
       fetchConfig(item.name).then((data) => {
         this.form.name = item.name;
         this.form.data = data;
       });
+      this.collapse = ["1"];
     },
     save() {
       if (!this.form.name) {
@@ -90,7 +95,9 @@ export default {
       if (!this.form.data) {
         return ElMessage.error("请输入配置内容");
       }
-      saveConfig(this.form.name, this.form.data).then(this.fresh).then(this.reset);
+      saveConfig(this.form.name, this.form.data)
+        .then(this.fresh)
+        .then(this.reset);
     },
     reset() {
       this.$refs.formRef.resetFields();

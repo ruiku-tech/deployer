@@ -2,11 +2,9 @@
   <div>
     <el-table :data="details" style="width: 100%">
       <el-table-column prop="name" label="组合名字" width="150" />
-      <el-table-column label="命令详情" width="400">
+      <el-table-column label="命令详情">
         <template #default="scope">
-          <pre>
-            {{ scope.row.cmd }}
-          </pre>
+          <div v-html="scope.row.cmd.join('<br/><br/>').replace('\n','<br/>')"></div>
         </template>
       </el-table-column>
     </el-table>
