@@ -1,20 +1,23 @@
 <template>
   <div id="operator">
     <el-tabs v-model="active" @tab-click="onTabChange">
-      <el-tab-pane label="文件管理" name="first"
-        ><Files ref="first"
+      <el-tab-pane label="文件管理" name="files"
+        ><Files ref="files"
       /></el-tab-pane>
-      <el-tab-pane label="服务器管理" name="second"
-        ><Hosts ref="second"
+      <el-tab-pane label="全局变量" name="vars"
+        ><Vars ref="vars"
       /></el-tab-pane>
-      <el-tab-pane label="配置管理" name="third"
-        ><Configs ref="third"
+      <el-tab-pane label="服务器管理" name="hosts"
+        ><Hosts ref="hosts"
       /></el-tab-pane>
-      <el-tab-pane label="脚本管理" name="fourth"
-        ><Scripts ref="fourth"
+      <el-tab-pane label="配置管理" name="configs"
+        ><Configs ref="configs"
       /></el-tab-pane>
-      <el-tab-pane label="部署" name="fifth"
-        ><Deploys ref="fifth"
+      <el-tab-pane label="脚本管理" name="srcipts"
+        ><Scripts ref="srcipts"
+      /></el-tab-pane>
+      <el-tab-pane label="部署" name="deploys"
+        ><Deploys ref="deploys"
       /></el-tab-pane>
     </el-tabs>
   </div>
@@ -22,6 +25,7 @@
 
 <script>
 import Files from "./Files.vue";
+import Vars from "./Vars.vue";
 import Hosts from "./Hosts.vue";
 import Configs from "./Configs.vue";
 import Scripts from "./Scripts.vue";
@@ -31,11 +35,12 @@ export default {
   name: "operator",
   data() {
     return {
-      active: "first",
+      active: "files",
     };
   },
   components: {
     Files,
+    Vars,
     Hosts,
     Configs,
     Scripts,

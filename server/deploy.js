@@ -23,6 +23,27 @@ const upload = multer({
 
 router.use(bodyParser.json());
 
+// {服务器名字:'host,password'}
+// 获取变量
+router.get("/vars", (req, res) => {
+  const filePath = path.resolve(__dirname, "vars.ini");
+  fs.readFile(filePath, "utf-8", (err, data) => {
+    res.send({ err, data: data ? JSON.parse(data) : {} });
+  });
+});
+// 获取配置
+router.post("/vars", (req, res) => {
+  const filePath = path.resolve(__dirname, "vars.ini");
+  fs.writeFile(
+    filePath,
+    JSON.stringify(req.body.data, null, 2),
+    "utf-8",
+    (err) => {
+      res.send({ err });
+    }
+  );
+});
+
 const fileDir = path.resolve(__dirname, "./files");
 
 // 获取文件列表

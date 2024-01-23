@@ -135,3 +135,5 @@ server/bats/**
 server/files/**
 server/scripts/**
 server/temp/**
+server/hosts.ini
+server/vars.ini

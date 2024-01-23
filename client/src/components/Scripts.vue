@@ -12,7 +12,7 @@
                 v-model="form.data"
                 :autosize="{ minRows: 2, maxRows: 20 }"
                 type="textarea"
-                placeholder="put: [FILE:文件名字],/root/dir \n run: docker run server -config [CONF:配置名字] --host [HOST:服务器名字]"
+                placeholder="put: [FILE:文件名字],/root/dir \n run: docker run server -config [CONF:配置名字] --host [HOST:服务器名字] [VAR:变量]"
               />
             </el-form-item>
             <el-form-item>

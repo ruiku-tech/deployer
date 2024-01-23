@@ -3,6 +3,7 @@ const broadcast = require("./broadcast");
 const fs = require("fs");
 const path = require("path");
 const dayjs = require("dayjs");
+const config = require("./config");
 
 function putFile(conn, localFile, remoteFile) {
   return new Promise((resolve, reject) => {
@@ -77,19 +78,16 @@ function query(conn, cmd) {
   });
 }
 
-const fileDir = path.resolve(__dirname, "./files");
-const hostsFile = path.resolve(__dirname, "hosts.ini");
-const configDir = path.resolve(__dirname, "./configs");
-const scriptDir = path.resolve(__dirname, "./scripts");
-const batDir = path.resolve(__dirname, "./bats");
+const { varsFile, fileDir, hostsFile, configDir, scriptDir, batDir } = config;
 
 const regExp = /\[.+?\]/g;
 
-const FILE_TYPE = 'FILE'
-const CFG_TYPE = 'CONF'
-const HOST_TYPE = 'HOST'
+const VAR_TYPE = "VAR";
+const FILE_TYPE = "FILE";
+const CFG_TYPE = "CONF";
+const HOST_TYPE = "HOST";
 
-function resolveExpress(scriptContent, files, from) {
+function resolveExpress(scriptContent, files, vars, from) {
   // 替换文件路径、服务器名字、配置（并更换配置里面的东西）
   const dynamics = scriptContent.match(regExp);
   if (dynamics) {
@@ -105,7 +103,7 @@ function resolveExpress(scriptContent, files, from) {
           const configContent = fs.readFileSync(filePath, "utf-8");
           if (configContent) {
             from[value] = 1;
-            const ret = resolveExpress(configContent, files, from);
+            const ret = resolveExpress(configContent, files, vars, from);
             if (ret.err) {
               ret[item] = ret;
             } else {
@@ -141,6 +139,12 @@ function resolveExpress(scriptContent, files, from) {
         } else {
           ret[item] = { err: `文件[${filename}]找不到` };
         }
+      } else if (key === VAR_TYPE) {
+        if (vars[value]) {
+          ret[item] = { data: vars[value] };
+        } else {
+          ret[item] = { err: `变量[${value}]找不到` };
+        }
       } else {
         ret[item] = { err: `变量[${key}]不支持` };
       }
@@ -157,7 +161,20 @@ function resolveExpress(scriptContent, files, from) {
   return { data: scriptContent };
 }
 
+function parseVars() {
+  const varStr = fs.readFileSync(varsFile, "utf-8");
+  const lines = varStr.split("\n");
+  return lines.reduce((ret, item) => {
+    const arr = item.split(":");
+    if (arr[0]) {
+      ret[arr[0]] = arr[1].trim();
+    }
+    return ret;
+  }, {});
+}
+
 function parse(list, files) {
+  const vars = parseVars();
   const hosts = JSON.parse(fs.readFileSync(hostsFile, "utf-8"));
   return list.map((item, index) => {
     const lines = item.data.split("\n");
@@ -170,18 +187,18 @@ function parse(list, files) {
       const script = lines[i];
       const filePath = path.resolve(scriptDir, script);
       let scriptContent = fs.readFileSync(filePath, "utf-8");
-      const ret = resolveExpress(scriptContent, files, {});
+      const ret = resolveExpress(scriptContent, files, vars, {});
       if (ret.err) {
         return ret;
       }
       scriptContent = ret.data;
-      cmds.push(...scriptContent.split('\n'));
+      cmds.push(...scriptContent.split("\n"));
     }
     return { server, cmds };
   });
 }
-const RUN_CMD = 'run:'
-const PUT_CMD = 'put:'
+const RUN_CMD = "run:";
+const PUT_CMD = "put:";
 
 async function deply(item) {
   let resolve, reject;
@@ -204,7 +221,7 @@ async function deply(item) {
     .on("ready", async function () {
       for (let i = 0; i < item.cmds.length; ++i) {
         const cmd = item.cmds[i];
-        broadcast.cast(`NORM:${cmd}`)
+        broadcast.cast(`NORM:${cmd}`);
         if (cmd.startsWith(PUT_CMD)) {
           const desc = cmd.slice(PUT_CMD.length).trim();
           const paths = desc.split(",");

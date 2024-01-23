@@ -1,3 +1,4 @@
+export * from './vars'
 export * from './files'
 export * from './hosts'
 export * from './configs'
