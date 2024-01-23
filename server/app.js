@@ -8,7 +8,7 @@ const install = require("./install");
 install.check();
 
 const app = express();
-const port = 3000;
+const port = 80;
 
 app.use(cors());
 // 静态文件中间件，用于提供Vue应用的静态资源
