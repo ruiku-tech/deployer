@@ -20,6 +20,9 @@ function check() {
   if (!fs.existsSync(config.batDir)) {
     fs.mkdirSync(config.batDir);
   }
+  if (!fs.existsSync(config.tempDir)) {
+    fs.mkdirSync(config.tempDir);
+  }
 }
 
 module.exports = {

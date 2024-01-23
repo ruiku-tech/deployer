@@ -6,6 +6,7 @@ const hostsFile = path.resolve(__dirname, "hosts.ini");
 const configDir = path.resolve(__dirname, "./configs");
 const scriptDir = path.resolve(__dirname, "./scripts");
 const batDir = path.resolve(__dirname, "./bats");
+const tempDir = path.resolve(__dirname, "./temp");
 
 module.exports = {
   varsFile,
@@ -14,4 +15,5 @@ module.exports = {
   configDir,
   scriptDir,
   batDir,
+  tempDir,
 };
