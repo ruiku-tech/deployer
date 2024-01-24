@@ -200,6 +200,8 @@ function parse(list, files) {
 const RUN_CMD = "run:";
 const PUT_CMD = "put:";
 
+const deploying = [];
+
 async function deply(item) {
   let resolve, reject;
   const promise = new Promise((rs, rj) => {
@@ -208,6 +210,7 @@ async function deply(item) {
   });
   const errors = [];
   const conn = new Client();
+  deploying.push({ conn, host });
   const serverInfo = item.server.split(":");
   const host = serverInfo[0];
   const password = serverInfo[1];
@@ -241,6 +244,10 @@ async function deply(item) {
       } else {
         resolve();
       }
+      const index = deploying.findIndex((item) => item.host === host);
+      if (index >= 0) {
+        deploying.splice(index, 1);
+      }
     });
 }
 
@@ -255,8 +262,20 @@ function run(server, cmd) {
   return deply({ server, cmds: [cmd] });
 }
 
+function getDeployings() {
+  return deploying.map((item) => item.host);
+}
+function stopDeploy(host) {
+  const item = deploying.find((item) => item.host === host);
+  if (item) {
+    item.conn.end();
+  }
+}
+
 module.exports = {
   parse,
   deployList,
   run,
+  getDeployings,
+  stopDeploy,
 };

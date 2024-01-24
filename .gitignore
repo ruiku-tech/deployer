@@ -137,3 +137,4 @@ server/scripts/**
 server/temp/**
 server/hosts.ini
 server/vars.ini
+server/test.tar.gz

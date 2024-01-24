@@ -238,4 +238,16 @@ router.post("/run", (req, res) => {
     });
 });
 
+// 获取正在部署的
+router.get("/deployings", (req, res) => {
+  res.send({ data: executer.getDeployings() });
+});
+
+// 获取部署
+router.delete("/deploying", (req, res) => {
+  const host = req.query.host;
+  executer.stopDeploy(host);
+  res.send({ data: "sccess" });
+});
+
 module.exports = router;
