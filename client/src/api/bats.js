@@ -5,11 +5,11 @@ export function fetchBats() {
 }
 
 export function fetchBat(name) {
-  return service.get(`/bat?name=${name}`);
+  return service.get(`/bat?name=${encodeURIComponent(name)}`);
 }
 export function saveBat(name, data) {
   return service.post("/bat", { name, data });
 }
 export function deleteBat(name) {
-  return service.delete(`/bat?name=${name}`);
+  return service.delete(`/bat?name=${encodeURIComponent(name)}`);
 }

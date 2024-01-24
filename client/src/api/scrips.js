@@ -5,11 +5,11 @@ export function fetchScripts() {
 }
 
 export function fetchScript(name) {
-  return service.get(`/script?name=${name}`);
+  return service.get(`/script?name=${encodeURIComponent(name)}`);
 }
 export function saveScript(name, data) {
   return service.post("/script", { name, data });
 }
 export function deleteScript(name) {
-  return service.delete(`/script?name=${name}`);
+  return service.delete(`/script?name=${encodeURIComponent(name)}`);
 }

@@ -5,11 +5,11 @@ export function fetchConfigs() {
 }
 
 export function fetchConfig(name) {
-  return service.get(`/config?name=${name}`);
+  return service.get(`/config?name=${encodeURIComponent(name)}`);
 }
 export function saveConfig(name, data) {
   return service.post("/config", { name, data });
 }
 export function deleteConfig(name) {
-  return service.delete(`/config?name=${name}`);
+  return service.delete(`/config?name=${encodeURIComponent(name)}`);
 }

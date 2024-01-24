@@ -15,5 +15,5 @@ export function uploadFile(file) {
 }
 
 export function deleteFile(name) {
-  service.delete(`/file?name=${name}`);
+  service.delete(`/file?name=${encodeURIComponent(name)}`);
 }

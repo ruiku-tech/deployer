@@ -34,7 +34,7 @@ service.interceptors.response.use(
     const data = response.data;
 
     if (data.err) {
-      ElMessage.error(data.err);
+      ElMessage.error(`异常错误:${data.err.code}`);
       return undefined;
     }
     return data.data;
