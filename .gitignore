@@ -139,3 +139,4 @@ server/temp/**
 server/hosts.ini
 server/vars.ini
 server/test.tar.gz
+server/dist.zip

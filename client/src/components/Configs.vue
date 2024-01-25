@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="content">
     <el-collapse v-model="collapse">
       <el-collapse-item title="点击新增" name="1">
         <div class="panel">

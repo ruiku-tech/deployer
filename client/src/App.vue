@@ -49,4 +49,7 @@ html,body{
   background: #f0f0f0;
   border-radius: 4px;
 }
+.content{
+  overflow-y: scroll;
+}
 </style>

@@ -5,11 +5,12 @@ const path = require("path");
 const dayjs = require("dayjs");
 const bodyParser = require("body-parser");
 const executer = require("./executer");
+const config = require('./config')
 
 var multer = require("multer");
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "./files"); // 上传文件的存储路径
+    cb(null, path.resolve(__dirname, "files")); // 上传文件的存储路径
   },
   filename: function (req, file, cb) {
     const now = dayjs();
@@ -34,14 +35,9 @@ router.get("/vars", (req, res) => {
 // 获取配置
 router.post("/vars", (req, res) => {
   const filePath = path.resolve(__dirname, "vars.ini");
-  fs.writeFile(
-    filePath,
-    req.body.data,
-    "utf-8",
-    (err) => {
-      res.send({ err });
-    }
-  );
+  fs.writeFile(filePath, req.body.data, "utf-8", (err) => {
+    res.send({ err });
+  });
 });
 
 const fileDir = path.resolve(__dirname, "./files");
@@ -192,6 +188,19 @@ router.get("/deploys", (req, res) => {
     })
   );
 });
+
+function parseVars() {
+  const varStr = fs.readFileSync(config.varsFile, "utf-8");
+  const lines = varStr.split("\n");
+  return lines.reduce((ret, item) => {
+    const arr = item.split(":");
+    if (arr[0]) {
+      ret[arr[0]] = arr[1].trim();
+    }
+    return ret;
+  }, {});
+}
+
 // 部署
 router.post("/deploy", (req, res) => {
   const batNames = req.body.list;
@@ -210,7 +219,10 @@ router.post("/deploy", (req, res) => {
         .join(",")}的脚本未找到，请先配置`,
     });
   }
-  list = executer.parse(list, req.body.files);
+  const vars = parseVars();
+  const hosts = JSON.parse(fs.readFileSync(config.hostsFile, "utf-8") || "{}");
+  const context = { vars, hosts, files: req.body.files };
+  list = executer.parse.call(context, list);
   const parseErrs = list.filter((item) => item.err);
   if (parseErrs.length) {
     return res.send({
@@ -225,7 +237,7 @@ router.post("/deploy", (req, res) => {
     () => {}
   );
   res.send({ data: "success" });
-  executer.deployList(list);
+  executer.deployList.call(context, list);
 });
 router.post("/run", (req, res) => {
   executer

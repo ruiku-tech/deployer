@@ -1,17 +1,57 @@
 <template>
-  <div id="logger"></div>
+  <div class="right">
+    <div class="deploying">
+      <div class="title">部署中</div>
+      <div class="list">
+        <el-tag
+          v-for="deploying in deployings"
+          :key="deploying"
+          closable
+          @close="stop(deploying)"
+        >
+          {{ deploying }}
+        </el-tag>
+      </div>
+    </div>
+    <div id="logger"></div>
+  </div>
 </template>
 
 <script>
+import { getDeployings, stopDeploy } from "../api";
+import { confirmDelete } from "../utils";
+
 export default {
   name: "logger",
+  data() {
+    return {
+      deployings: [],
+    };
+  },
   mounted() {
     this.logger = document.getElementById("logger");
     this.hearter = 0;
     this.connect();
     document.addEventListener("keyup", this.onKeyUp);
+    this.loopSyncDeploying();
   },
   methods: {
+    stop(host) {
+      confirmDelete(`确定停止${host}的部署？`).then(() => {
+        stopDeploy(host).then(() => {
+          this.loopSyncDeploying();
+        });
+      });
+    },
+    loopSyncDeploying() {
+      if (this.timer) {
+        clearInterval(this.timer);
+      }
+      this.timer = setInterval(this.syncDeploying, 10000);
+    },
+    syncDeploying() {
+      getDeployings().then((list) => (this.deployings = list));
+    },
     onKeyUp(e) {
       if (e.ctrlKey && e.code === "KeyL") {
         this.logger.innerHTML = "";
@@ -56,12 +96,40 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style>
-#logger {
+.right {
   height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-left: 10px;
+}
+.deploying {
+  height: 36px;
+  display: flex;
+  flex-direction: row;
+  border: 1px solid #eee;
+}
+.deploying .title {
+  padding: 0 10px;
+  background: #f0f0f0;
+  border-right: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+}
+.deploying .list {
+  flex: 1;
+  overflow-x: scroll;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+#logger {
   flex: 1;
   background-color: #000;
   color: #eee;
   overflow-y: scroll;
+  margin-top: 10px;
   padding: 10px;
   box-sizing: border-box;
 }

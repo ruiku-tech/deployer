@@ -9,3 +9,11 @@ export function deploy(list, files) {
 export function run(server, cmd) {
   return service.post("/run", { server, cmd });
 }
+
+export function getDeployings(){
+  return service.get('/deployings')
+}
+
+export function stopDeploy(host){
+  return service.delete(`/deploying?host=${encodeURIComponent(host)}`);
+}

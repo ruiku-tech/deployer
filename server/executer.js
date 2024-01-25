@@ -87,7 +87,10 @@ const FILE_TYPE = "FILE";
 const CFG_TYPE = "CONF";
 const HOST_TYPE = "HOST";
 
-function resolveExpress(scriptContent, files, vars, from) {
+function resolveExpress(scriptContent, from) {
+  const files = this.files;
+  const vars = this.vars;
+  const hosts = this.hosts;
   // 替换文件路径、服务器名字、配置（并更换配置里面的东西）
   const dynamics = scriptContent.match(regExp);
   if (dynamics) {
@@ -103,11 +106,11 @@ function resolveExpress(scriptContent, files, vars, from) {
           const configContent = fs.readFileSync(filePath, "utf-8");
           if (configContent) {
             from[value] = 1;
-            const ret = resolveExpress(configContent, files, vars, from);
-            if (ret.err) {
-              ret[item] = ret;
+            const the = resolveExpress.call(this, configContent, from);
+            if (the.err) {
+              ret[item] = the;
             } else {
-              if (configContent === ret.data) {
+              if (configContent === the.data) {
                 ret[item] = { data: filePath };
               } else {
                 const now = dayjs();
@@ -117,12 +120,12 @@ function resolveExpress(scriptContent, files, vars, from) {
                   "temp",
                   `${time}~${value}`
                 );
-                fs.writeFileSync(newPath, ret.data, "utf-8");
+                fs.writeFileSync(newPath, the.data, "utf-8");
                 ret[item] = { data: newPath };
               }
             }
           } else {
-            return { err: `配置[${value}]不存在` };
+            ret[item] = { err: `配置[${value}]不存在` };
           }
         }
       } else if (key === HOST_TYPE) {
@@ -161,21 +164,9 @@ function resolveExpress(scriptContent, files, vars, from) {
   return { data: scriptContent };
 }
 
-function parseVars() {
-  const varStr = fs.readFileSync(varsFile, "utf-8");
-  const lines = varStr.split("\n");
-  return lines.reduce((ret, item) => {
-    const arr = item.split(":");
-    if (arr[0]) {
-      ret[arr[0]] = arr[1].trim();
-    }
-    return ret;
-  }, {});
-}
-
-function parse(list, files) {
-  const vars = parseVars();
-  const hosts = JSON.parse(fs.readFileSync(hostsFile, "utf-8"));
+function parse(list) {
+  const vars = this.vars;
+  const hosts = this.hosts;
   return list.map((item, index) => {
     const lines = item.data.split("\n");
     const server = hosts[lines[0]];
@@ -187,7 +178,7 @@ function parse(list, files) {
       const script = lines[i];
       const filePath = path.resolve(scriptDir, script);
       let scriptContent = fs.readFileSync(filePath, "utf-8");
-      const ret = resolveExpress(scriptContent, files, vars, {});
+      const ret = resolveExpress.call(this, scriptContent, {});
       if (ret.err) {
         return ret;
       }

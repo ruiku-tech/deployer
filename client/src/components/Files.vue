@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="content">
     <div class="panel">
       <input ref="file" type="file" placeholder="请选择文件" />
       <el-button type="primary" round @click="upload">上传</el-button>
