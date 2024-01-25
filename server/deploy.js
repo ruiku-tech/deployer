@@ -28,7 +28,7 @@ router.use(bodyParser.json());
 router.get("/vars", (req, res) => {
   const filePath = path.resolve(__dirname, "vars.ini");
   fs.readFile(filePath, "utf-8", (err, data) => {
-    res.send({ err, data: data ? JSON.parse(data) : {} });
+    res.send({ err, data });
   });
 });
 // 获取配置
@@ -36,7 +36,7 @@ router.post("/vars", (req, res) => {
   const filePath = path.resolve(__dirname, "vars.ini");
   fs.writeFile(
     filePath,
-    JSON.stringify(req.body.data, null, 2),
+    req.body.data,
     "utf-8",
     (err) => {
       res.send({ err });
@@ -214,7 +214,7 @@ router.post("/deploy", (req, res) => {
   const parseErrs = list.filter((item) => item.err);
   if (parseErrs.length) {
     return res.send({
-      err: parseErrs.map((item) => item.name).join(","),
+      err: parseErrs.map((item) => item.err).join(","),
     });
   }
   // 记录部署记录

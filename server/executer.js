@@ -194,7 +194,7 @@ function parse(list, files) {
       scriptContent = ret.data;
       cmds.push(...scriptContent.split("\n"));
     }
-    return { server, cmds };
+    return { server, cmds: cmds.filter((cmd) => cmd) };
   });
 }
 const RUN_CMD = "run:";
@@ -210,10 +210,10 @@ async function deply(item) {
   });
   const errors = [];
   const conn = new Client();
-  deploying.push({ conn, host });
   const serverInfo = item.server.split(":");
   const host = serverInfo[0];
   const password = serverInfo[1];
+  deploying.push({ conn, host });
   conn
     .connect({
       host,
