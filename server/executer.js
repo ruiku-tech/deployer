@@ -80,7 +80,7 @@ function query(conn, cmd) {
 
 const { varsFile, fileDir, hostsFile, configDir, scriptDir, batDir } = config;
 
-const regExp = /\[.+?\]/g;
+const regExp = /\[.+?:.+?\]/g;
 
 const VAR_TYPE = "VAR";
 const FILE_TYPE = "FILE";

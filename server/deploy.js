@@ -200,6 +200,13 @@ function parseVars() {
     return ret;
   }, {});
 }
+function parseHosts(){
+  const ret = JSON.parse(fs.readFileSync(config.hostsFile, "utf-8") || "{}");
+  return Object.entries(ret).reduce((ret,item)=>{
+    ret[item[0]]=item[1].split(":")[0]
+    return ret;
+  },{})
+}
 
 // 部署
 router.post("/deploy", (req, res) => {
@@ -220,7 +227,7 @@ router.post("/deploy", (req, res) => {
     });
   }
   const vars = parseVars();
-  const hosts = JSON.parse(fs.readFileSync(config.hostsFile, "utf-8") || "{}");
+  const hosts = parseHosts();
   const context = { vars, hosts, files: req.body.files };
   list = executer.parse.call(context, list);
   const parseErrs = list.filter((item) => item.err);
