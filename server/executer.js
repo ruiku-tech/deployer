@@ -130,7 +130,7 @@ function resolveExpress(scriptContent, from) {
         }
       } else if (key === HOST_TYPE) {
         if (hosts[value]) {
-          ret[item] = { data: hosts[value].split(",")[0] };
+          ret[item] = { data: hosts[value].host };
         } else {
           ret[item] = { err: `服务器[${value}]不存在` };
         }
@@ -201,9 +201,8 @@ async function deply(item) {
   });
   const errors = [];
   const conn = new Client();
-  const serverInfo = item.server.split(":");
-  const host = serverInfo[0];
-  const password = serverInfo[1];
+  const host = item.server.host;
+  const password = item.server.password;
   deploying.push({ conn, host });
   conn
     .connect({

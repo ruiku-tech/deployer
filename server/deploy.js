@@ -203,7 +203,8 @@ function parseVars() {
 function parseHosts(){
   const ret = JSON.parse(fs.readFileSync(config.hostsFile, "utf-8") || "{}");
   return Object.entries(ret).reduce((ret,item)=>{
-    ret[item[0]]=item[1].split(":")[0]
+    const info = item[1].split(":")
+    ret[item[0]]={host:info[0],password:info[1]}
     return ret;
   },{})
 }
