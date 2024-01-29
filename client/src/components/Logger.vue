@@ -66,7 +66,9 @@ export default {
       }
       var ws = new WebSocket(wsUrl);
       ws.onmessage = (e) => {
-        this.addLog(e.data);
+        if (e.data) {
+          this.addLog(e.data);
+        }
       };
       ws.onclose = () => {
         clearInterval(this.hearter);

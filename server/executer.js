@@ -19,17 +19,20 @@ function putFile(conn, localFile, remoteFile) {
             if (Date.now() - now > 1000 || transferred >= total) {
               now = Date.now();
               broadcast.cast(
-                `INFO:进度:${((transferred * 100) / total).toFixed(2)}%`
+                `INFO:[${conn.host}] 进度:${(
+                  (transferred * 100) /
+                  total
+                ).toFixed(2)}%`
               );
             }
           },
         },
         function (err) {
           if (err) {
-            broadcast.cast(`ERR:${err.message}`);
+            broadcast.cast(`ERR:[${conn.host}] ${err.message}`);
             return reject(err);
           }
-          broadcast.cast(`INFO:文件上传成功`);
+          broadcast.cast(`INFO:[${conn.host}] 文件上传成功`);
           resolve();
         }
       );
@@ -43,18 +46,18 @@ function execute(conn, cmd) {
       stream
         .on("close", function (code, signal) {
           if (signal) {
-            broadcast.cast(`ERR:${cmd} 执行失败 code:${signal}`);
+            broadcast.cast(`ERR:[${conn.host}] ${cmd} 执行失败 code:${signal}`);
             reject(new Error(`${cmd} 执行失败 code:${signal}`));
           } else {
-            broadcast.cast(`INFO:${cmd} 完成 code:${signal}`);
+            broadcast.cast(`INFO:[${conn.host}] ${cmd} 完成`);
             resolve();
           }
         })
         .on("data", function (data) {
-          broadcast.cast(`INFO:${data}`);
+          broadcast.cast(`INFO:[${conn.host}] ${data}`);
         })
         .stderr.on("data", function (data) {
-          broadcast.cast(`ERR:${data}`);
+          broadcast.cast(`ERR:[${conn.host}] ${data}`);
         });
     });
   });
@@ -97,7 +100,7 @@ function resolveExpress(scriptContent, from) {
     const map = dynamics.reduce((ret, item) => {
       const arr = item.split(":");
       const key = arr[0].slice(1);
-      const value = arr[1].slice(0, -1);
+      const value = arr[1].slice(0, -1).trim();
       if (key === CFG_TYPE) {
         if (from[value]) {
           ret[item] = { err: `配置[${value}]内有循环引用` };
@@ -203,7 +206,8 @@ async function deply(item) {
   const conn = new Client();
   const host = item.server.host;
   const password = item.server.password;
-  deploying.push({ conn, host });
+  conn.host = host;
+  broadcast.cast(`NORM:[${conn.host}] 开始连接`);
   conn
     .connect({
       host,
@@ -212,17 +216,22 @@ async function deply(item) {
       password,
     })
     .on("ready", async function () {
-      for (let i = 0; i < item.cmds.length; ++i) {
-        const cmd = item.cmds[i];
-        broadcast.cast(`NORM:${cmd}`);
-        if (cmd.startsWith(PUT_CMD)) {
-          const desc = cmd.slice(PUT_CMD.length).trim();
-          const paths = desc.split(",");
-          await putFile(conn, paths[0], paths[1]);
-        } else if (cmd.startsWith(RUN_CMD)) {
-          const desc = cmd.slice(RUN_CMD.length).trim();
-          await execute(conn, desc);
+      deploying.push({ conn, host });
+      try {
+        for (let i = 0; i < item.cmds.length; ++i) {
+          const cmd = item.cmds[i];
+          broadcast.cast(`NORM:[${conn.host}] ${cmd}`);
+          if (cmd.startsWith(PUT_CMD)) {
+            const desc = cmd.slice(PUT_CMD.length).trim();
+            const paths = desc.split(",");
+            await putFile(conn, paths[0], paths[1]);
+          } else if (cmd.startsWith(RUN_CMD)) {
+            const desc = cmd.slice(RUN_CMD.length).trim();
+            await execute(conn, desc);
+          }
         }
+      } finally {
+        conn.end();
       }
     })
     .on("error", (err) => {

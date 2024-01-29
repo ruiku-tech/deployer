@@ -19,6 +19,9 @@
       <el-tab-pane label="部署" name="deploys"
         ><Deploys ref="deploys"
       /></el-tab-pane>
+      <el-tab-pane label="执行" name="executer"
+        ><Executer ref="executer"
+      /></el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -30,6 +33,7 @@ import Hosts from "./Hosts.vue";
 import Configs from "./Configs.vue";
 import Scripts from "./Scripts.vue";
 import Deploys from "./Deploys.vue";
+import Executer from "./Executer.vue";
 
 export default {
   name: "operator",
@@ -45,6 +49,7 @@ export default {
     Configs,
     Scripts,
     Deploys,
+    Executer,
   },
   methods: {
     onTabChange(tab) {

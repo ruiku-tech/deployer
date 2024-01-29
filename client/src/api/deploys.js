@@ -10,10 +10,10 @@ export function run(server, cmd) {
   return service.post("/run", { server, cmd });
 }
 
-export function getDeployings(){
-  return service.get('/deployings')
+export function getDeployings() {
+  return service.get("/deployings", { headers: { nofeel: true } });
 }
 
-export function stopDeploy(host){
+export function stopDeploy(host) {
   return service.delete(`/deploying?host=${encodeURIComponent(host)}`);
 }

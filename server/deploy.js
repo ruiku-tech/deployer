@@ -5,7 +5,7 @@ const path = require("path");
 const dayjs = require("dayjs");
 const bodyParser = require("body-parser");
 const executer = require("./executer");
-const config = require('./config')
+const config = require("./config");
 
 var multer = require("multer");
 const storage = multer.diskStorage({
@@ -42,10 +42,32 @@ router.post("/vars", (req, res) => {
 
 const fileDir = path.resolve(__dirname, "./files");
 
+function queryFileStat(filePath) {
+  return new Promise((rs, rj) => {
+    fs.stat(filePath, (err, stat) => {
+      if (err) {
+        return rs(`err:${err.code}`);
+      }
+      rs(`${(stat.size / 1000000).toFixed(3)}M(${stat.size})`);
+    });
+  });
+}
 // 获取文件列表
 router.get("/files", (req, res) => {
   fs.readdir(fileDir, (err, files) => {
     res.send({ err, data: files.map((file) => ({ file })) });
+  });
+});
+router.get("/files-stat", (req, res) => {
+  fs.readdir(fileDir, (err, files) => {
+    Promise.all(
+      files.map((file) => queryFileStat(path.resolve(fileDir, file)))
+    ).then((list) => {
+      res.send({
+        err,
+        data: files.map((file, index) => ({ file, size: list[index] })),
+      });
+    });
   });
 });
 // 文件上传
@@ -200,13 +222,13 @@ function parseVars() {
     return ret;
   }, {});
 }
-function parseHosts(){
+function parseHosts() {
   const ret = JSON.parse(fs.readFileSync(config.hostsFile, "utf-8") || "{}");
-  return Object.entries(ret).reduce((ret,item)=>{
-    const info = item[1].split(":")
-    ret[item[0]]={host:info[0],password:info[1]}
+  return Object.entries(ret).reduce((ret, item) => {
+    const info = item[1].split(":");
+    ret[item[0]] = { host: info[0], password: info[1] };
     return ret;
-  },{})
+  }, {});
 }
 
 // 部署
@@ -248,8 +270,13 @@ router.post("/deploy", (req, res) => {
   executer.deployList.call(context, list);
 });
 router.post("/run", (req, res) => {
+  const hosts = parseHosts();
+  const server = hosts[req.body.server];
+  if (!server) {
+    return res.send({ err: `找不到服务器:${req.body.server}` });
+  }
   executer
-    .run(req.body.server, req.body.cmd)
+    .run(server, req.body.cmd)
     .then(() => {
       res.send({ data: "success" });
     })

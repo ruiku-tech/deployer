@@ -4,6 +4,10 @@ export function fetchFiles() {
   return service.get("/files");
 }
 
+export function fetchFilesStat() {
+  return service.get("/files-stat");
+}
+
 export function uploadFile(file) {
   const formData = new FormData();
   formData.append("file", file);
@@ -11,6 +15,7 @@ export function uploadFile(file) {
     headers: {
       "Content-Type": "multipart/form-data",
     },
+    timeout: 20 * 60 * 1000,
   });
 }
 

@@ -1,27 +1,30 @@
-const WebSocket = require('ws');
-const clients = []
-function init(server){
+const WebSocket = require("ws");
+const clients = [];
+function init(server) {
   const wss = new WebSocket.Server({ server });
-  wss.on('connection', ws => {
-    if(!clients.includes(ws)){
-      clients.push(ws)
+  wss.on("connection", (ws) => {
+    if (!clients.includes(ws)) {
+      clients.push(ws);
     }
-    ws.on('close',()=>{
-      const index = clients.indexOf(ws)
-      if(index>=0){
-        clients.splice(index,1)
+    ws.on("close", () => {
+      const index = clients.indexOf(ws);
+      if (index >= 0) {
+        clients.splice(index, 1);
       }
-    })
-    ws.send('INFO:Hello, client!');
+    });
+    ws.on("message", (e) => {
+      ws.send("");
+    });
+    ws.send("INFO:Hello, client!");
   });
 }
-function cast(msg){
-  clients.forEach(ws=>{
-    ws.send(msg)
-  })
+function cast(msg) {
+  clients.forEach((ws) => {
+    ws.send(msg);
+  });
 }
 
-
-module.exports={
-  init,cast
-}
+module.exports = {
+  init,
+  cast,
+};
