@@ -1,21 +1,27 @@
 <template>
   <div class="main">
-    <Operator/>
-    <Logger/>
+    <Operator />
+    <Spliter />
+    <Logger />
+    <EnvSwitch />
   </div>
 </template>
 
 <script>
-import Logger from './components/Logger.vue'
-import Operator from './components/Operator.vue'
+import Logger from "./components/Logger.vue";
+import Operator from "./components/Operator.vue";
+import Spliter from './components/Spliter.vue';
+import EnvSwitch from "./components/EnvSwitch.vue";
 
 export default {
-  name: 'App',
+  name: "App",
   components: {
     Logger,
-    Operator
-  }
-}
+    Operator,
+    Spliter,
+    EnvSwitch
+  },
+};
 </script>
 
 <style>
@@ -27,13 +33,14 @@ export default {
   color: #2c3e50;
   height: 100%;
 }
-html,body{
+html,
+body {
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
 }
-.main{
+.main {
   height: 100%;
   display: flex;
   padding: 10px;
@@ -44,12 +51,24 @@ html,body{
   justify-content: space-between;
   align-items: center;
 }
-.panel{
+.panel {
   padding: 10px;
   background: #f0f0f0;
   border-radius: 4px;
 }
-.content{
+.content {
   overflow-y: scroll;
+}
+.cmd {
+  font-size: 12px;
+  background: #f0f0f0;
+  padding: 0 1px;
+  margin: 1px;
+  line-height: 1.2;
+}
+.center{
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 </style>

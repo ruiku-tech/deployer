@@ -25,7 +25,7 @@ export default {
   name: "logger",
   data() {
     return {
-      deployings: [],
+      deployings: []
     };
   },
   mounted() {
@@ -86,7 +86,7 @@ export default {
     },
     addLog(info) {
       const log = info.split(":");
-      var line = document.createElement("div");
+      var line = document.createElement("pre");
       line.className = `item ${log[0]}`;
       line.textContent = log.slice(1).join(":");
       this.logger.appendChild(line);
@@ -100,10 +100,10 @@ export default {
 <style>
 .right {
   height: 100%;
-  flex: 1;
   display: flex;
   flex-direction: column;
-  margin-left: 10px;
+  overflow: hidden;
+  flex: 1;
 }
 .deploying {
   height: 36px;
@@ -130,7 +130,7 @@ export default {
   flex: 1;
   background-color: #000;
   color: #eee;
-  overflow-y: scroll;
+  overflow: scroll;
   margin-top: 10px;
   padding: 10px;
   box-sizing: border-box;
@@ -141,7 +141,7 @@ export default {
   font-size: 12px;
   background: #222;
   border-radius: 2px;
-  margin-bottom: 2px;
+  margin: 1px 0;
 }
 #logger .ERR {
   color: #ee0000;

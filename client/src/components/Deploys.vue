@@ -1,5 +1,19 @@
 <template>
   <div class="content">
+    <div class="compose-box">
+      <span>
+        编排组合
+        <el-select v-model="compose" placeholder="请选择" style="width: 240px">
+          <el-option
+            v-for="item in composes"
+            :key="item.name"
+            :label="item.name"
+            :value="item.name"
+          />
+        </el-select>
+      </span>
+      <el-button @click="addCompose">新增组合</el-button>
+    </div>
     <el-collapse v-model="collapse">
       <el-collapse-item title="点击新增" name="1">
         <div class="panel">
@@ -60,8 +74,11 @@
     <el-card class="box-card">
       <template #header>
         <div class="card-header">
-          <el-button @click="deploy">部署</el-button>
-          <el-button class="button" @click="fresh">刷新</el-button>
+          <span>
+            <el-button @click="deploy">部署</el-button>
+            <el-button class="button" @click="fresh">刷新</el-button>
+          </span>
+          <el-button class="button" @click="delCompose">删除此组合</el-button>
         </div>
       </template>
       <el-table
@@ -80,6 +97,19 @@
                 size="small"
                 placeholder="过滤"
               />
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column
+          prop="host"
+          label="服务器"
+          width="180"
+          style="font-size: 12px"
+        />
+        <el-table-column label="执行脚本" width="200">
+          <template #default="scope">
+            <div class="cmd" v-for="(item, i) in scope.row.cmds" :key="i">
+              {{ item }}
             </div>
           </template>
         </el-table-column>
@@ -102,7 +132,7 @@
 </template>
 
 <script>
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   deleteBat,
   fetchBat,
@@ -110,6 +140,8 @@ import {
   fetchHosts,
   fetchScripts,
   saveBat,
+  saveBatItem,
+  deleteBatItem,
 } from "../api";
 import DeployConfirm from "./DeployConfirm.vue";
 import { confirmDelete } from "../utils";
@@ -122,6 +154,8 @@ export default {
       list: [],
       hosts: [],
       scripts: [],
+      compose: "",
+      composes: [],
       form: {
         name: "",
         host: "",
@@ -133,13 +167,20 @@ export default {
       filterKey: "",
     };
   },
-  computed:{
-    finalList(){
-      if(this.filterKey){
-        return this.list.filter(item=>item.name.includes(this.filterKey))
+  computed: {
+    finalList() {
+      if (this.filterKey) {
+        return this.list.filter((item) => item.name.includes(this.filterKey));
       }
-      return this.list
-    }
+      return this.list;
+    },
+  },
+  watch: {
+    compose(value) {
+      if (value) {
+        this.fresh();
+      }
+    },
   },
   mounted() {
     this.fresh();
@@ -148,6 +189,7 @@ export default {
     reload() {
       this.initHost();
       this.initScripts();
+      this.freshComposes();
     },
     initHost() {
       fetchHosts().then((data) => {
@@ -159,23 +201,30 @@ export default {
         this.scripts = data;
       });
     },
-    fresh() {
+    freshComposes() {
       fetchBats().then((data) => {
-        this.list = data;
+        this.composes = data;
+        if (!this.composes.includes(this.compose)) {
+          this.compose = this.composes[0].name;
+        }
+      });
+    },
+    fresh() {
+      if (!this.compose) return;
+      fetchBat(this.compose).then((data) => {
+        this.list = Object.entries(data).map(([name, value]) => ({
+          ...value,
+          name,
+        }));
       });
     },
     del(item) {
       confirmDelete().then(() => {
-        deleteBat(item.name).then(this.fresh);
+        deleteBatItem(this.compose, item.name).then(this.fresh);
       });
     },
     edit(item) {
-      fetchBat(item.name).then((data) => {
-        this.form.name = item.name;
-        const arr = data.split("\n");
-        this.form.host = arr[0];
-        this.form.cmds = arr.slice(1).map((value) => ({ value }));
-      });
+      this.form = JSON.parse(JSON.stringify(item));
       this.collapse = ["1"];
     },
     save() {
@@ -188,9 +237,9 @@ export default {
       if (!this.form.cmds.length) {
         return ElMessage.error("请添加脚本");
       }
-      const arr = this.form.cmds.concat().map((item) => item.value);
-      arr.unshift(this.form.host);
-      saveBat(this.form.name, arr.join("\n")).then(this.fresh).then(this.reset);
+      const cmds = this.form.cmds.concat().map((item) => item.value);
+      const body = { cmds, name: this.form.name, host: this.form.host };
+      saveBatItem(this.compose, body).then(this.fresh).then(this.reset);
     },
     reset() {
       this.form.cmds = [];
@@ -214,6 +263,18 @@ export default {
       }
       this.deploying = true;
     },
+    addCompose() {
+      ElMessageBox.prompt("输入组合名字", "新增编排组合").then(({ value }) => {
+        if (value) {
+          saveBat(value).then(this.freshComposes);
+        }
+      });
+    },
+    delCompose() {
+      confirmDelete().then(() => {
+        deleteBat(this.compose).then(this.freshComposes);
+      });
+    },
   },
 };
 </script>
@@ -227,5 +288,14 @@ export default {
 .filter-input {
   flex: 1;
   margin-left: 10px;
+}
+.compose-box {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #f0f0f0;
+  border-radius: 2px;
 }
 </style>

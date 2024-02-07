@@ -1,5 +1,6 @@
 import axios from "axios";
 import { ElMessage, ElLoading } from "element-plus";
+import dataCenter from "../dataCenter";
 
 const BASE_TIMEOUT = 20 * 1000;
 const service = axios.create({
@@ -27,6 +28,7 @@ function endLoad() {
 }
 
 service.interceptors.request.use((config) => {
+  config.headers.env = dataCenter.env.value;
   if (!config.headers.nofeel) {
     startLoad();
     if (config.timeout > BASE_TIMEOUT) {

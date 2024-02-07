@@ -3,7 +3,6 @@ const broadcast = require("./broadcast");
 const fs = require("fs");
 const path = require("path");
 const dayjs = require("dayjs");
-const config = require("./config");
 
 function putFile(conn, localFile, remoteFile) {
   return new Promise((resolve, reject) => {
@@ -41,10 +40,14 @@ function putFile(conn, localFile, remoteFile) {
 }
 function execute(conn, cmd) {
   return new Promise((resolve, reject) => {
+    let buffer = "";
     conn.exec(cmd, function (err, stream) {
       if (err) return reject(err);
       stream
         .on("close", function (code, signal) {
+          if (buffer) {
+            broadcast.cast(`INFO:[${conn.host}] ${buffer}`);
+          }
           if (signal) {
             broadcast.cast(`ERR:[${conn.host}] ${cmd} 执行失败 code:${signal}`);
             reject(new Error(`${cmd} 执行失败 code:${signal}`));
@@ -54,7 +57,14 @@ function execute(conn, cmd) {
           }
         })
         .on("data", function (data) {
-          broadcast.cast(`INFO:[${conn.host}] ${data}`);
+          buffer += data.toString();
+          if (buffer.includes("\n")) {
+            const arr = buffer.split("\n");
+            arr
+              .slice(0, -1)
+              .map((l) => broadcast.cast(`INFO:[${conn.host}] ${l}`));
+            buffer = arr[arr.length - 1];
+          }
         })
         .stderr.on("data", function (data) {
           broadcast.cast(`ERR:[${conn.host}] ${data}`);
@@ -81,8 +91,6 @@ function query(conn, cmd) {
   });
 }
 
-const { varsFile, fileDir, hostsFile, configDir, scriptDir, batDir } = config;
-
 const regExp = /\[.+?:.+?\]/g;
 
 const VAR_TYPE = "VAR";
@@ -94,6 +102,8 @@ function resolveExpress(scriptContent, from) {
   const files = this.files;
   const vars = this.vars;
   const hosts = this.hosts;
+  const fileDir = this.fileDir;
+  const configDir = this.configDir;
   // 替换文件路径、服务器名字、配置（并更换配置里面的东西）
   const dynamics = scriptContent.match(regExp);
   if (dynamics) {
@@ -167,18 +177,21 @@ function resolveExpress(scriptContent, from) {
   return { data: scriptContent };
 }
 
+// [{name:string,host:string,cmds:string[]}]
 function parse(list) {
+  // 总的变量配置
   const vars = this.vars;
+  // 总的服务器配置
   const hosts = this.hosts;
+  const scriptDir = this.scriptDir;
   return list.map((item, index) => {
-    const lines = item.data.split("\n");
-    const server = hosts[lines[0]];
+    const server = hosts[item.host];
     if (!server) {
-      return { err: `第${index + 1}个配置,找不到服务器[${lines[0]}]配置` };
+      return { err: `第${index + 1}个配置,找不到服务器[${item.host}]配置` };
     }
     const cmds = [];
-    for (let i = 1; i < lines.length; i++) {
-      const script = lines[i];
+    for (let i = 1; i < item.cmds.length; i++) {
+      const script = item.cmds[i];
       const filePath = path.resolve(scriptDir, script);
       let scriptContent = fs.readFileSync(filePath, "utf-8");
       const ret = resolveExpress.call(this, scriptContent, {});

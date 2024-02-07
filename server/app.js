@@ -3,19 +3,24 @@ const path = require("path");
 var http = require("http");
 const cors = require("cors");
 const broadcast = require("./broadcast");
-const install = require("./install");
-
-install.check();
+const env = require('./env.middleware')
+const fs = require("fs")
 
 const app = express();
 const port = 3000;
+
+// 初始化环境
+const workspaceDir = path.resolve(__dirname, "workspace");
+if(!fs.existsSync(workspaceDir)){
+  fs.mkdirSync(workspaceDir)
+}
 
 app.use(cors());
 // 静态文件中间件，用于提供Vue应用的静态资源
 app.use("/static", express.static(path.join(__dirname, "dist")));
 
 var indexRouter = require("./deploy");
-app.use("/deploy", indexRouter);
+app.use("/deploy", env.contextMaker ,indexRouter);
 
 // 处理所有GET请求，返回Vue应用的主页
 app.get("/", (req, res) => {

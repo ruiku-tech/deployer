@@ -4,7 +4,9 @@
       <el-table-column prop="name" label="组合名字" width="150" />
       <el-table-column label="命令详情">
         <template #default="scope">
-          <div v-html="scope.row.cmd.join('<br/><br/>').replace('\n','<br/>')"></div>
+          <div class="compose" v-for="(item,i) in scope.row.cmd" :key="i">
+            <div class="cmd-reverse" v-for="(c,j) in item" :key="j">{{ c }}</div>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -42,7 +44,7 @@
 
 <script>
 import { ElMessage } from "element-plus";
-import { fetchBat, deploy, fetchFiles, fetchScript } from "../api";
+import { deploy, fetchFiles, fetchScript } from "../api";
 export default {
   name: "deploy-confirm",
   props: ["list"],
@@ -65,28 +67,25 @@ export default {
       fetchFiles().then((data) => (this.fileOptions = data));
     },
     async init() {
-      const list = this.list.map(async (item) => {
-        const bat = await fetchBat(item.name);
-        return await Promise.all(
-          bat
-            .split("\n")
-            .slice(1)
-            .map((scriptName) => fetchScript(scriptName))
+      // [{name:string,host:string,cmds:string[]}]
+      const scriptList = await this.list.map((item) => {
+        return Promise.all(
+          item.cmds.map((scriptName) => fetchScript(scriptName))
         );
       });
       const fileMap = {};
       const errors = [];
-      Promise.all(list).then((list) => {
+      Promise.all(scriptList).then((list) => {
         this.details = this.list.map((item, index) => ({
           name: item.name,
-          cmd: list[index],
+          cmd: list[index].map(c=>c.split('\n')),
         }));
         list.forEach((scripts, index) => {
           scripts.forEach((item) => {
             const files = item.match(/\[FILE:.+?\]/g);
             if (files) {
               files.forEach((exp) => {
-                const name = exp.slice('[FILE:'.length, -1);
+                const name = exp.slice("[FILE:".length, -1);
                 const batName = this.list[index].name;
                 if (fileMap[name]) {
                   errors.push(
@@ -120,14 +119,26 @@ export default {
         ret[item.name] = item.value;
         return ret;
       }, {});
-      deploy(
-        this.list.map((item) => item.name),
-        files
-      ).then(this.close);
+      deploy(this.list, files).then(this.close);
     },
   },
 };
 </script>
 
 <style>
+.compose{
+  border: 1px solid #999;
+  padding: 1px;
+}
+.compose:not(:first-child){
+  border-top: none;
+}
+.cmd-reverse {
+  font-size: 12px;
+  background: #222;
+  color: #eee;
+  padding: 0 1px;
+  margin: 1px;
+  line-height: 1.2;
+}
 </style>
