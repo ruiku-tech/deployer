@@ -3,6 +3,9 @@
     <div class="compose-box">
       <span>
         编排组合
+        <el-tooltip content="一般分为：初始化、部署、重启" placement="bottom">
+          <el-icon><QuestionFilled /></el-icon>
+        </el-tooltip>
         <el-select v-model="compose" placeholder="请选择" style="width: 240px">
           <el-option
             v-for="item in composes"
@@ -224,7 +227,9 @@ export default {
       });
     },
     edit(item) {
-      this.form = JSON.parse(JSON.stringify(item));
+      const data = JSON.parse(JSON.stringify(item));
+      const { cmds, ...rest } = data;
+      this.form = { ...rest, cmds: cmds.map((value) => ({ value })) };
       this.collapse = ["1"];
     },
     save() {

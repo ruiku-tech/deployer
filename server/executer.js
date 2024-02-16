@@ -91,7 +91,7 @@ function query(conn, cmd) {
   });
 }
 
-const regExp = /\[.+?:.+?\]/g;
+const regExp = /\[(VAR|FILE|CONF|HOST):.+?\]/g;
 
 const VAR_TYPE = "VAR";
 const FILE_TYPE = "FILE";
@@ -104,6 +104,7 @@ function resolveExpress(scriptContent, from) {
   const hosts = this.hosts;
   const fileDir = this.fileDir;
   const configDir = this.configDir;
+  const tempDir = this.tempDir;
   // 替换文件路径、服务器名字、配置（并更换配置里面的东西）
   const dynamics = scriptContent.match(regExp);
   if (dynamics) {
@@ -128,11 +129,7 @@ function resolveExpress(scriptContent, from) {
               } else {
                 const now = dayjs();
                 const time = now.format("YYYYMMDD-HH:mm:ss");
-                const newPath = path.resolve(
-                  __dirname,
-                  "temp",
-                  `${time}~${value}`
-                );
+                const newPath = path.resolve(tempDir, `${time}~${value}`);
                 fs.writeFileSync(newPath, the.data, "utf-8");
                 ret[item] = { data: newPath };
               }
@@ -190,7 +187,7 @@ function parse(list) {
       return { err: `第${index + 1}个配置,找不到服务器[${item.host}]配置` };
     }
     const cmds = [];
-    for (let i = 1; i < item.cmds.length; i++) {
+    for (let i = 0; i < item.cmds.length; i++) {
       const script = item.cmds[i];
       const filePath = path.resolve(scriptDir, script);
       let scriptContent = fs.readFileSync(filePath, "utf-8");

@@ -5,7 +5,7 @@ const path = require("path");
 const dayjs = require("dayjs");
 const bodyParser = require("body-parser");
 const executer = require("./executer");
-const envRouter = require('./env.router')
+const envRouter = require("./env.router");
 
 var multer = require("multer");
 const storage = multer.diskStorage({
@@ -24,7 +24,7 @@ const upload = multer({
 
 router.use(bodyParser.json());
 
-router.use('/env', envRouter)
+router.use("/env", envRouter);
 // {服务器名字:'host,password'}
 // 获取变量
 router.get("/vars", (req, res) => {
@@ -56,10 +56,11 @@ router.get("/files", (req, res) => {
   });
 });
 router.get("/files-stat", (req, res) => {
-  console.log("env", req.headers.env)
   fs.readdir(req.context.fileDir, (err, files) => {
     Promise.all(
-      files.map((file) => queryFileStat(path.resolve(req.context.fileDir, file)))
+      files.map((file) =>
+        queryFileStat(path.resolve(req.context.fileDir, file))
+      )
     ).then((list) => {
       res.send({
         err,
@@ -102,7 +103,7 @@ router.post("/hosts", (req, res) => {
 
 // 获取配置列表
 router.get("/configs", (req, res) => {
-  const context = req.context
+  const context = req.context;
   fs.readdir(context.configDir, (err, files) => {
     res.send({ err, data: files.map((name) => ({ name })) });
   });
@@ -110,7 +111,7 @@ router.get("/configs", (req, res) => {
 // 获取配置
 router.get("/config", (req, res) => {
   const name = req.query.name;
-  const context = req.context
+  const context = req.context;
   const filePath = path.resolve(context.configDir, name);
   fs.readFile(filePath, "utf-8", (err, data) => {
     res.send({ err, data });
@@ -119,7 +120,7 @@ router.get("/config", (req, res) => {
 // 上传配置
 router.post("/config", (req, res) => {
   const name = req.body.name;
-  const context = req.context
+  const context = req.context;
   const filePath = path.resolve(context.configDir, name);
   fs.writeFile(filePath, req.body.data, "utf-8", (err) => {
     res.send({ err });
@@ -128,7 +129,7 @@ router.post("/config", (req, res) => {
 // 删除配置
 router.delete("/config", (req, res) => {
   const name = req.query.name;
-  const context = req.context
+  const context = req.context;
   const filePath = path.resolve(context.configDir, name);
   fs.unlink(filePath, (err) => {
     res.send({ err });
@@ -137,7 +138,7 @@ router.delete("/config", (req, res) => {
 
 // 获取脚本列表
 router.get("/scripts", (req, res) => {
-  const context = req.context
+  const context = req.context;
   fs.readdir(context.scriptDir, (err, files) => {
     res.send({ err, data: files.map((name) => ({ name })) });
   });
@@ -145,7 +146,7 @@ router.get("/scripts", (req, res) => {
 // 获取脚本
 router.get("/script", (req, res) => {
   const name = req.query.name;
-  const context = req.context
+  const context = req.context;
   const filePath = path.resolve(context.scriptDir, name);
   fs.readFile(filePath, "utf-8", (err, data) => {
     res.send({ err, data });
@@ -154,7 +155,7 @@ router.get("/script", (req, res) => {
 // 更新脚本
 router.post("/script", (req, res) => {
   const name = req.body.name;
-  const context = req.context
+  const context = req.context;
   const filePath = path.resolve(context.scriptDir, name);
   fs.writeFile(filePath, req.body.data, "utf-8", (err) => {
     res.send({ err });
@@ -163,7 +164,7 @@ router.post("/script", (req, res) => {
 // 删除脚本
 router.delete("/script", (req, res) => {
   const name = req.query.name;
-  const context = req.context
+  const context = req.context;
   const filePath = path.resolve(context.scriptDir, name);
   fs.unlink(filePath, (err) => {
     res.send({ err });
@@ -191,7 +192,7 @@ router.get("/bat", (req, res) => {
 // 新增编排
 router.post("/bat", (req, res) => {
   const name = req.body.name;
-  const context = req.context
+  const context = req.context;
   const filePath = path.resolve(context.batDir, name);
   const exist = fs.existsSync(filePath);
   if (exist) {
@@ -203,7 +204,7 @@ router.post("/bat", (req, res) => {
 });
 // 删除编排
 router.delete("/bat", (req, res) => {
-  const context = req.context
+  const context = req.context;
   const name = req.query.name;
   const filePath = path.resolve(context.batDir, name);
   fs.unlink(filePath, (err) => {
@@ -213,7 +214,7 @@ router.delete("/bat", (req, res) => {
 // 更新编排
 router.post("/bat-item", (req, res) => {
   const name = req.body.name;
-  const context = req.context
+  const context = req.context;
   const filePath = path.resolve(context.batDir, name);
   fs.readFile(filePath, "utf-8", (err, data) => {
     const json = JSON.parse(data);
@@ -227,7 +228,7 @@ router.post("/bat-item", (req, res) => {
 // 删除部署
 router.delete("/bat-item", (req, res) => {
   const name = req.query.name;
-  const context = req.context
+  const context = req.context;
   const filePath = path.resolve(context.batDir, name);
   fs.readFile(filePath, "utf-8", (err, data) => {
     const json = JSON.parse(data);
@@ -271,13 +272,16 @@ function parseHosts() {
 // 部署
 router.post("/deploy", (req, res) => {
   // [{name:string,host:string,cmds:string[]}]
-  const list = req.body.list;
+  let list = req.body.list;
   if (!list || !list.length) {
     return res.send({ err: "请选择部署的脚本" });
   }
   const vars = parseVars.call(req.context);
   const hosts = parseHosts.call(req.context);
-  const context = { vars, hosts, files: req.body.files };
+  const context = Object.assign(
+    { vars, hosts, files: req.body.files },
+    req.context
+  );
   list = executer.parse.call(context, list);
   const parseErrs = list.filter((item) => item.err);
   if (parseErrs.length) {
@@ -287,7 +291,10 @@ router.post("/deploy", (req, res) => {
   }
   // 记录部署记录
   fs.writeFile(
-    path.resolve(req.context.deployDir, `${dayjs().format("YYYYMMDD-HH:mm:ss")}.txt`),
+    path.resolve(
+      req.context.deployDir,
+      `${dayjs().format("YYYYMMDD-HH:mm:ss")}.txt`
+    ),
     JSON.stringify(list, null, 2),
     "utf-8",
     () => {}
