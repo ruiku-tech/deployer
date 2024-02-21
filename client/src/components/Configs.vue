@@ -78,7 +78,7 @@ export default {
     },
     del(item) {
       confirmDelete().then(() => {
-        deleteConfig(item.name).then(this.fresh);
+        deleteConfig(item.name).then(this.fresh)
       });
     },
     edit(item) {

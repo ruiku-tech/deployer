@@ -196,7 +196,7 @@ function parse(list) {
         return ret;
       }
       scriptContent = ret.data;
-      cmds.push(...scriptContent.split("\n"));
+      cmds.push(...scriptContent.split("\n").filter(line=>!line.trim().startsWith('#')));
     }
     return { server, cmds: cmds.filter((cmd) => cmd) };
   });
@@ -258,6 +258,7 @@ async function deply(item) {
         deploying.splice(index, 1);
       }
     });
+  return promise;
 }
 
 async function deployList(list) {

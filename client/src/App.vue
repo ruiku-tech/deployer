@@ -56,6 +56,11 @@ body {
   background: #f0f0f0;
   border-radius: 4px;
 }
+.panel .title{
+  height: 40px;
+  font-size: 20px;
+  line-height: 40px;
+}
 .content {
   overflow-y: scroll;
 }

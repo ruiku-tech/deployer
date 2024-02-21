@@ -20,7 +20,7 @@
         <el-tab-pane label="部署编排" name="deploys"
           ><Deploys ref="deploys"
         /></el-tab-pane>
-        <el-tab-pane label="执行" name="executer"
+        <el-tab-pane label="其他" name="executer"
           ><Executer ref="executer"
         /></el-tab-pane>
       </el-tabs>

@@ -14,6 +14,7 @@ export function uploadFile(file) {
   return service.post("/file", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
+      withProgress: 1,
     },
     timeout: 20 * 60 * 1000,
   });

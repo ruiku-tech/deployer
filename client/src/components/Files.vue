@@ -54,14 +54,18 @@ export default {
     upload() {
       const file = this.$refs.file;
       if (file.files[0]) {
-        uploadFile(file.files[0]).then(this.fresh);
+        uploadFile(file.files[0]).then(()=>{
+          setTimeout(this.fresh, 1000);
+        });
       } else {
         ElMessage.error("请先选择文件");
       }
     },
     delFile(item) {
       confirmDelete().then(() => {
-        deleteFile(item.file).then(this.fresh);
+        deleteFile(item.file).then(()=>{
+          setTimeout(this.fresh, 1000);
+        });
       });
     },
   },

@@ -6,6 +6,7 @@ const dayjs = require("dayjs");
 const bodyParser = require("body-parser");
 const executer = require("./executer");
 const envRouter = require("./env.router");
+const cert = require("./cert");
 
 var multer = require("multer");
 const storage = multer.diskStorage({
@@ -328,6 +329,25 @@ router.delete("/deploying", (req, res) => {
   const host = req.query.host;
   executer.stopDeploy(host);
   res.send({ data: "sccess" });
+});
+
+// 申请证书
+router.post("/deploy-ssl", (req, res) => {
+  const domain = req.body.domain;
+  const context = req.context;
+  const hosts = parseHosts.call(req.context);
+  const server = hosts[req.body.server];
+  if (!server) {
+    return res.send({ err: `找不到服务器:${req.body.server}` });
+  }
+  cert.requestCertificate
+    .call(context, server, domain)
+    .then(() => {
+      res.send({ data: "sccess" });
+    })
+    .catch((err) => {
+      res.send({ err });
+    });
 });
 
 module.exports = router;

@@ -31,7 +31,7 @@ service.interceptors.request.use((config) => {
   config.headers.env = dataCenter.env.value;
   if (!config.headers.nofeel) {
     startLoad();
-    if (config.timeout > BASE_TIMEOUT) {
+    if (config.headers.withProgress) {
       config.onUploadProgress = (event) => {
         const progress = Math.round((event.loaded * 100) / event.total);
         if (loading) {
@@ -58,6 +58,7 @@ service.interceptors.response.use(
   (err) => {
     endLoad();
     ElMessage.error(err.message);
+    return new Promise();
   }
 );
 
