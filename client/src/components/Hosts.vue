@@ -29,7 +29,7 @@
         </div>
       </template>
       <el-table :data="list" style="width: 100%">
-        <el-table-column prop="name" label="名字"/>
+        <el-table-column prop="name" label="名字" />
         <el-table-column prop="host" label="IP" width="200" />
         <el-table-column prop="password" label="密码" width="200" />
         <el-table-column label="操作" width="120">
@@ -62,7 +62,7 @@ export default {
         host: "",
         password: "",
       },
-      collapse:[]
+      collapse: [],
     };
   },
   mounted() {
@@ -71,10 +71,12 @@ export default {
   methods: {
     fresh() {
       fetchHosts().then((data) => {
-        this.list = Object.entries(data).map(([name, value]) => {
-          const info = value.split(":");
-          return { name, host: info[0], password: info[1] };
-        });
+        this.list = Object.entries(data)
+          .map(([name, value]) => {
+            const info = value.split(":");
+            return { name, host: info[0], password: info[1] };
+          })
+          .sort((a, b) => (a.host === b.host ? 0 : a.host > b.host ? 1 : -1));
       });
     },
     del(item) {
@@ -89,7 +91,7 @@ export default {
       this.form.name = item.name;
       this.form.host = item.host;
       this.form.password = item.password;
-      this.collapse = ['1']
+      this.collapse = ["1"];
     },
     save() {
       if (!this.form.name) {

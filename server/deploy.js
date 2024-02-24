@@ -7,6 +7,7 @@ const bodyParser = require("body-parser");
 const executer = require("./executer");
 const envRouter = require("./env.router");
 const cert = require("./cert");
+const utils = require("./utils");
 
 var multer = require("multer");
 const storage = multer.diskStorage({
@@ -250,26 +251,6 @@ router.get("/deploys", (req, res) => {
   );
 });
 
-function parseVars() {
-  const varStr = fs.readFileSync(this.varsFile, "utf-8");
-  const lines = varStr.split("\n");
-  return lines.reduce((ret, item) => {
-    const arr = item.split(":");
-    if (arr[0]) {
-      ret[arr[0]] = arr[1].trim();
-    }
-    return ret;
-  }, {});
-}
-function parseHosts() {
-  const ret = JSON.parse(fs.readFileSync(this.hostsFile, "utf-8") || "{}");
-  return Object.entries(ret).reduce((ret, item) => {
-    const info = item[1].split(":");
-    ret[item[0]] = { host: info[0], password: info[1] };
-    return ret;
-  }, {});
-}
-
 // 部署
 router.post("/deploy", (req, res) => {
   // [{name:string,host:string,cmds:string[]}]
@@ -277,8 +258,8 @@ router.post("/deploy", (req, res) => {
   if (!list || !list.length) {
     return res.send({ err: "请选择部署的脚本" });
   }
-  const vars = parseVars.call(req.context);
-  const hosts = parseHosts.call(req.context);
+  const vars = utils.parseVars.call(req.context);
+  const hosts = utils.parseHosts.call(req.context);
   const context = Object.assign(
     { vars, hosts, files: req.body.files },
     req.context
@@ -304,13 +285,13 @@ router.post("/deploy", (req, res) => {
   executer.deployList.call(context, list);
 });
 router.post("/run", (req, res) => {
-  const hosts = parseHosts.call(req.context);
+  const hosts = utils.parseHosts.call(req.context);
   const server = hosts[req.body.server];
   if (!server) {
     return res.send({ err: `找不到服务器:${req.body.server}` });
   }
-  executer
-    .run(server, req.body.cmd)
+  executer.run
+    .call(req.context, server, req.body.cmd)
     .then(() => {
       res.send({ data: "success" });
     })
@@ -335,7 +316,7 @@ router.delete("/deploying", (req, res) => {
 router.post("/deploy-ssl", (req, res) => {
   const domain = req.body.domain;
   const context = req.context;
-  const hosts = parseHosts.call(req.context);
+  const hosts = utils.parseHosts.call(req.context);
   const server = hosts[req.body.server];
   if (!server) {
     return res.send({ err: `找不到服务器:${req.body.server}` });

@@ -73,10 +73,13 @@ export default {
   methods: {
     fresh() {
       fetchVars().then((data) => {
-        this.list = data.split("\n").map((line) => {
-          const info = line.split(":");
-          return { name: info[0], value: info[1] };
-        });
+        this.list = data
+          .split("\n")
+          .map((line) => {
+            const info = line.split(":");
+            return { name: info[0], value: info[1] };
+          })
+          .sort((a, b) => (a.name > b.name ? 1 : -1));
       });
     },
     del(item) {
@@ -109,7 +112,13 @@ export default {
       this.$refs.formRef.resetFields();
     },
     requestSave(list) {
-      const data = list.map((item) => `${item.name}:${item.value}`).join("\n");
+      const merged = list.reduce((ret, item) => {
+        ret[item.name] = item.value;
+        return ret;
+      }, {});
+      const data = Object.entries(merged)
+        .map(([k, v]) => `${k}:${v}`)
+        .join("\n");
       return saveVars(data).then(this.fresh);
     },
   },

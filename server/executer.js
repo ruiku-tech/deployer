@@ -3,16 +3,51 @@ const broadcast = require("./broadcast");
 const fs = require("fs");
 const path = require("path");
 const dayjs = require("dayjs");
+const utils = require("./utils");
 
-function putFile(conn, localFile, remoteFile) {
+function getFile(conn, srcFile, distFile) {
+  return new Promise((resolve, reject) => {
+    conn.sftp(function (err, sftp) {
+      if (err) return reject(err);
+      let now = Date.now();
+      // 下载文件
+      sftp.fastGet(
+        srcFile,
+        distFile,
+        {
+          step: function (transferred, chunk, total) {
+            if (Date.now() - now > 1000 || transferred >= total) {
+              now = Date.now();
+              broadcast.cast(
+                `INFO:[${conn.host}] 进度:${(
+                  (transferred * 100) /
+                  total
+                ).toFixed(2)}%`
+              );
+            }
+          },
+        },
+        function (err) {
+          if (err) {
+            broadcast.cast(`ERR:[${conn.host}] ${err.message}`);
+            return reject(err);
+          }
+          broadcast.cast(`INFO:[${conn.host}] 文件下载成功`);
+          resolve();
+        }
+      );
+    });
+  });
+}
+function putFile(conn, srcFile, distFile) {
   return new Promise((resolve, reject) => {
     conn.sftp(function (err, sftp) {
       if (err) return reject(err);
       let now = Date.now();
       // 上传文件
       sftp.fastPut(
-        localFile,
-        remoteFile,
+        srcFile,
+        distFile,
         {
           step: function (transferred, chunk, total) {
             if (Date.now() - now > 1000 || transferred >= total) {
@@ -85,7 +120,7 @@ function query(conn, cmd) {
           result.push(data);
         })
         .stderr.on("data", function (data) {
-          result.push(data);
+          rbroadcast.cast(`ERR:[${conn.host}] ${data}`);
         });
     });
   });
@@ -173,6 +208,27 @@ function resolveExpress(scriptContent, from) {
   }
   return { data: scriptContent };
 }
+const funMap = {};
+function cmdEval(script, register) {
+  let fun = funMap[script];
+  if (!fun) {
+    fun = funMap[script] = new Function("$", `return ${script}`);
+  }
+  return fun(register);
+}
+
+// "AAAA$[0],$[1]"
+function resolveStack(cmd, stack) {
+  return cmd.replace(/\$\[(\d+?)\]/g, ($0, $1) => {
+    return stack[stack.length - 1 - $1] || '';
+  });
+}
+function updateVars(item) {
+  const vars = utils.parseVars.call(this);
+  const arr = item.split("=");
+  vars[arr[0]] = arr[1];
+  utils.saveVars.call(this, vars);
+}
 
 // [{name:string,host:string,cmds:string[]}]
 function parse(list) {
@@ -196,13 +252,23 @@ function parse(list) {
         return ret;
       }
       scriptContent = ret.data;
-      cmds.push(...scriptContent.split("\n").filter(line=>!line.trim().startsWith('#')));
+      cmds.push(
+        ...scriptContent
+          .split("\n")
+          .filter((line) => !line.trim().startsWith("#"))
+      );
     }
     return { server, cmds: cmds.filter((cmd) => cmd) };
   });
 }
 const RUN_CMD = "run:";
 const PUT_CMD = "put:";
+const GET_CMD = "get:";
+const QUERY_CMD = "rquery:";
+const RPUSH_CMD = "spush:";
+const RPOP_CMD = "spop:";
+const EVAL_CMD = "reval:";
+const UPDATE_CMD = "update:";
 
 const deploying = [];
 
@@ -228,16 +294,35 @@ async function deply(item) {
     .on("ready", async function () {
       deploying.push({ conn, host });
       try {
+        let stack = [];
+        let register;
         for (let i = 0; i < item.cmds.length; ++i) {
           const cmd = item.cmds[i];
           broadcast.cast(`NORM:[${conn.host}] ${cmd}`);
           if (cmd.startsWith(PUT_CMD)) {
-            const desc = cmd.slice(PUT_CMD.length).trim();
+            const desc = resolveStack(cmd.slice(PUT_CMD.length).trim());
             const paths = desc.split(",");
             await putFile(conn, paths[0], paths[1]);
+          } else if (cmd.startsWith(GET_CMD)) {
+            const desc = resolveStack(cmd.slice(GET_CMD.length).trim());
+            const paths = desc.split(",");
+            await getFile(conn, paths[0], paths[1]);
           } else if (cmd.startsWith(RUN_CMD)) {
-            const desc = cmd.slice(RUN_CMD.length).trim();
+            const desc = resolveStack(cmd.slice(RUN_CMD.length).trim());
             await execute(conn, desc);
+          } else if (cmd.startsWith(QUERY_CMD)) {
+            const desc = resolveStack(cmd.slice(QUERY_CMD.length).trim());
+            register = await query(conn, desc);
+          } else if (cmd.startsWith(RPUSH_CMD)) {
+            stack.push(register);
+          } else if (cmd.startsWith(RPOP_CMD)) {
+            register = stack.pop();
+          } else if (cmd.startsWith(EVAL_CMD)) {
+            const desc = resolveStack(cmd.slice(EVAL_CMD.length).trim());
+            register = cmdEval(desc, register);
+          } else if (cmd.startsWith(UPDATE_CMD)) {
+            const desc = resolveStack(cmd.slice(UPDATE_CMD.length).trim());
+            updateVars.call(this, desc);
           }
         }
       } finally {
@@ -264,12 +349,12 @@ async function deply(item) {
 async function deployList(list) {
   for (let i = 0; i < list.length; ++i) {
     const item = list[i];
-    await deply(item);
+    await deply.call(this, item);
   }
 }
 
 function run(server, cmd) {
-  return deply({ server, cmds: [cmd] });
+  return deply.call(this, { server, cmds: [cmd] });
 }
 
 function getDeployings() {

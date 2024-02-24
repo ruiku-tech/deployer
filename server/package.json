@@ -4,7 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "pm2 start pm2.config.js"
+    "start": "pm2 start pm2.config.js",
+    "put": "node ./scripts/put.js"
   },
   "keywords": [],
   "author": "",
