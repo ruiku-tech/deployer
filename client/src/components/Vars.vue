@@ -77,7 +77,7 @@ export default {
           .split("\n")
           .map((line) => {
             const info = line.split(":");
-            return { name: info[0], value: info[1] };
+            return { name: info[0], value: info.slice(1).join(':') };
           })
           .sort((a, b) => (a.name > b.name ? 1 : -1));
       });

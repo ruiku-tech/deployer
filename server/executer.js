@@ -73,24 +73,31 @@ function putFile(conn, srcFile, distFile) {
     });
   });
 }
-function execute(conn, cmd) {
+function getConnSteam(conn) {
+  if (conn.streamer) {
+    return conn.streamer;
+  }
   return new Promise((resolve, reject) => {
-    let buffer = "";
-    conn.exec(cmd, function (err, stream) {
-      if (err) return reject(err);
+    conn.shell((err, stream) => {
+      if (err) {
+        return reject(err);
+      }
+      conn.streamer = {
+        stream,
+        resolver: null,
+        rejecter: null,
+        cmd: "",
+        execute(cmd) {
+          this.cmd = cmd;
+          return new Promise((resolve, reject) => {
+            this.resolver = resolve;
+            this.rejecter = reject;
+            stream.write(`${cmd}\n`);
+          });
+        },
+      };
+      let buffer = "";
       stream
-        .on("close", function (code, signal) {
-          if (buffer) {
-            broadcast.cast(`INFO:[${conn.host}] ${buffer}`);
-          }
-          if (signal) {
-            broadcast.cast(`ERR:[${conn.host}] ${cmd} 执行失败 code:${signal}`);
-            reject(new Error(`${cmd} 执行失败 code:${signal}`));
-          } else {
-            broadcast.cast(`INFO:[${conn.host}] ${cmd} 完成`);
-            resolve();
-          }
-        })
         .on("data", function (data) {
           buffer += data.toString();
           if (buffer.includes("\n")) {
@@ -100,12 +107,29 @@ function execute(conn, cmd) {
               .map((l) => broadcast.cast(`INFO:[${conn.host}] ${l}`));
             buffer = arr[arr.length - 1];
           }
+          if (buffer.match(/# /)) {
+            broadcast.cast(`INFO:[${conn.host}] ${buffer}`);
+            buffer = "";
+            if (conn.notFirst) {
+              broadcast.cast(`NORM:[${conn.host}] ${conn.streamer.cmd} 完成`);
+              conn.streamer.resolver();
+            } else {
+              broadcast.cast(`INFO:[${conn.host}] 准备就绪`);
+            }
+            conn.notFirst = true;
+          }
         })
         .stderr.on("data", function (data) {
           broadcast.cast(`ERR:[${conn.host}] ${data}`);
         });
+      resolve(conn.streamer);
     });
   });
+}
+
+async function execute(conn, cmd) {
+  const streamer = await getConnSteam(conn);
+  streamer.execute(cmd);
 }
 function query(conn, cmd) {
   return new Promise((resolve, reject) => {
@@ -126,12 +150,13 @@ function query(conn, cmd) {
   });
 }
 
-const regExp = /\[(VAR|FILE|CONF|HOST):.+?\]/g;
+const regExp = /\[(VAR|FILE|CONF|HOST|ENV):.+?\]/g;
 
 const VAR_TYPE = "VAR";
 const FILE_TYPE = "FILE";
 const CFG_TYPE = "CONF";
 const HOST_TYPE = "HOST";
+const ENV_TYPE = "ENV";
 
 function resolveExpress(scriptContent, from) {
   const files = this.files;
@@ -193,6 +218,12 @@ function resolveExpress(scriptContent, from) {
         } else {
           ret[item] = { err: `变量[${value}]找不到` };
         }
+      } else if (key === ENV_TYPE) {
+        if (this[value]) {
+          ret[item] = { data: this[value] };
+        } else {
+          ret[item] = { err: `环境[${value}]找不到` };
+        }
       } else {
         ret[item] = { err: `变量[${key}]不支持` };
       }
@@ -212,16 +243,21 @@ const funMap = {};
 function cmdEval(script, register) {
   let fun = funMap[script];
   if (!fun) {
-    fun = funMap[script] = new Function("$", `return ${script}`);
+    fun = funMap[script] = new Function(
+      "$R",
+      script.includes("return") ? script : `return ${script}`
+    );
   }
   return fun(register);
 }
 
 // "AAAA$[0],$[1]"
-function resolveStack(cmd, stack) {
-  return cmd.replace(/\$\[(\d+?)\]/g, ($0, $1) => {
-    return stack[stack.length - 1 - $1] || '';
-  });
+function resolveStack(cmd, stack, host) {
+  return cmd
+    .replace(/\$\[(\d+?)\]/g, ($0, $1) => {
+      return stack[stack.length - 1 - $1] || "";
+    })
+    .replace(/\$H/g, host);
 }
 function updateVars(item) {
   const vars = utils.parseVars.call(this);
@@ -272,78 +308,123 @@ const UPDATE_CMD = "update:";
 
 const deploying = [];
 
+function genConn(host, password) {
+  let item = deploying.find((item) => item.host === host);
+  if (!item) {
+    let readyResolve, readyReject;
+    const waitReady = new Promise((resolve, reject) => {
+      readyResolve = resolve;
+      readyReject = reject;
+    });
+    const conn = new Client();
+    conn.host = host;
+    broadcast.cast(`NORM:[${conn.host}] 开始连接`);
+    conn
+      .connect({
+        host,
+        port: 22,
+        username: "root",
+        password,
+      })
+      .on("ready", readyResolve)
+      .on("close", () => {
+        readyReject();
+        const index = deploying.findIndex((item) => item.host === host);
+        if (index >= 0) {
+          deploying.splice(index, 1);
+        }
+      });
+    item = {
+      conn,
+      host,
+      waitReady,
+      close() {
+        conn.end();
+        readyReject();
+      },
+      using: true,
+      timer: Date.now(),
+      record() {
+        this.timer = Date.now();
+      },
+    };
+    deploying.push(item);
+  } else {
+    item.using = true;
+    item.record();
+    broadcast.cast(`NORM:[${item.host}] 缓存连接`);
+  }
+  return item;
+}
 async function deply(item) {
-  let resolve, reject;
-  const promise = new Promise((rs, rj) => {
-    resolve = rs;
-    reject = rj;
-  });
   const errors = [];
-  const conn = new Client();
   const host = item.server.host;
   const password = item.server.password;
-  conn.host = host;
-  broadcast.cast(`NORM:[${conn.host}] 开始连接`);
-  conn
-    .connect({
-      host,
-      port: 22,
-      username: "root",
-      password,
-    })
-    .on("ready", async function () {
-      deploying.push({ conn, host });
-      try {
-        let stack = [];
-        let register;
-        for (let i = 0; i < item.cmds.length; ++i) {
-          const cmd = item.cmds[i];
-          broadcast.cast(`NORM:[${conn.host}] ${cmd}`);
-          if (cmd.startsWith(PUT_CMD)) {
-            const desc = resolveStack(cmd.slice(PUT_CMD.length).trim());
-            const paths = desc.split(",");
-            await putFile(conn, paths[0], paths[1]);
-          } else if (cmd.startsWith(GET_CMD)) {
-            const desc = resolveStack(cmd.slice(GET_CMD.length).trim());
-            const paths = desc.split(",");
-            await getFile(conn, paths[0], paths[1]);
-          } else if (cmd.startsWith(RUN_CMD)) {
-            const desc = resolveStack(cmd.slice(RUN_CMD.length).trim());
-            await execute(conn, desc);
-          } else if (cmd.startsWith(QUERY_CMD)) {
-            const desc = resolveStack(cmd.slice(QUERY_CMD.length).trim());
-            register = await query(conn, desc);
-          } else if (cmd.startsWith(RPUSH_CMD)) {
-            stack.push(register);
-          } else if (cmd.startsWith(RPOP_CMD)) {
-            register = stack.pop();
-          } else if (cmd.startsWith(EVAL_CMD)) {
-            const desc = resolveStack(cmd.slice(EVAL_CMD.length).trim());
-            register = cmdEval(desc, register);
-          } else if (cmd.startsWith(UPDATE_CMD)) {
-            const desc = resolveStack(cmd.slice(UPDATE_CMD.length).trim());
-            updateVars.call(this, desc);
-          }
-        }
-      } finally {
-        conn.end();
+  const connect = genConn(host, password);
+  const conn = connect.conn;
+  let that = this;
+  await connect.waitReady;
+
+  try {
+    let stack = [];
+    let register;
+    for (let i = 0; i < item.cmds.length; ++i) {
+      const cmd = item.cmds[i];
+      broadcast.cast(`NORM:[${conn.host}] ${cmd}`);
+      if (cmd.startsWith(PUT_CMD)) {
+        const desc = resolveStack(
+          cmd.slice(PUT_CMD.length).trim(),
+          stack,
+          host
+        );
+        const paths = desc.split(",");
+        await putFile(conn, paths[0], paths[1]);
+      } else if (cmd.startsWith(GET_CMD)) {
+        const desc = resolveStack(
+          cmd.slice(GET_CMD.length).trim(),
+          stack,
+          host
+        );
+        const paths = desc.split(",");
+        await getFile(conn, paths[0], paths[1]);
+      } else if (cmd.startsWith(RUN_CMD)) {
+        const desc = resolveStack(
+          cmd.slice(RUN_CMD.length).trim(),
+          stack,
+          host
+        );
+        await execute(conn, desc);
+      } else if (cmd.startsWith(QUERY_CMD)) {
+        const desc = resolveStack(
+          cmd.slice(QUERY_CMD.length).trim(),
+          stack,
+          host
+        );
+        register = await query(conn, desc);
+      } else if (cmd.startsWith(RPUSH_CMD)) {
+        stack.push(register);
+      } else if (cmd.startsWith(RPOP_CMD)) {
+        register = stack.pop();
+      } else if (cmd.startsWith(EVAL_CMD)) {
+        const desc = resolveStack(
+          cmd.slice(EVAL_CMD.length).trim(),
+          stack,
+          host
+        );
+        register = cmdEval(desc, register);
+      } else if (cmd.startsWith(UPDATE_CMD)) {
+        const desc = resolveStack(
+          cmd.slice(UPDATE_CMD.length).trim(),
+          stack,
+          host
+        );
+        updateVars.call(that, desc);
       }
-    })
-    .on("error", (err) => {
-      reject(err);
-    })
-    .on("close", () => {
-      if (errors.length) {
-        reject(new Error(errors.join(",")));
-      } else {
-        resolve();
-      }
-      const index = deploying.findIndex((item) => item.host === host);
-      if (index >= 0) {
-        deploying.splice(index, 1);
-      }
-    });
-  return promise;
+      connect.record();
+    }
+  } finally {
+    connect.using = false;
+  }
 }
 
 async function deployList(list) {
@@ -353,8 +434,15 @@ async function deployList(list) {
   }
 }
 
-function run(server, cmd) {
-  return deply.call(this, { server, cmds: [cmd] });
+function run(server, scriptContent) {
+  const ret = resolveExpress.call(this, scriptContent, {});
+  if (ret.err) {
+    return ret;
+  }
+  const cmds = ret.data
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("#"));
+  return deply.call(this, { server, cmds });
 }
 
 function getDeployings() {
@@ -363,9 +451,18 @@ function getDeployings() {
 function stopDeploy(host) {
   const item = deploying.find((item) => item.host === host);
   if (item) {
-    item.conn.end();
+    item.close();
   }
 }
+setInterval(() => {
+  const now = Date.now();
+  const maxTime = 10 * 60 * 60 * 1000;
+  deploying.forEach((item) => {
+    if (!item.using && now - item.timer > maxTime) {
+      item.close();
+    }
+  });
+}, 5000);
 
 module.exports = {
   parse,
