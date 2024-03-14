@@ -20,12 +20,13 @@
 <script>
 import { getDeployings, stopDeploy } from "../api";
 import { confirmDelete } from "../utils";
+import dayjs from "dayjs";
 
 export default {
   name: "logger",
   data() {
     return {
-      deployings: []
+      deployings: [],
     };
   },
   mounted() {
@@ -88,7 +89,11 @@ export default {
       const log = info.split(":");
       var line = document.createElement("pre");
       line.className = `item ${log[0]}`;
-      line.textContent = log.slice(1).join(":");
+      if (log[0] === "NORM") {
+        line.textContent = `${log.slice(1).join(":")} @${dayjs().format('MM-DD hh:mm:ss')}`;
+      } else {
+        line.textContent = log.slice(1).join(":");
+      }
       this.logger.appendChild(line);
       this.logger.scrollTo(0, this.logger.scrollHeight);
     },

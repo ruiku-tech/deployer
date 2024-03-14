@@ -8,10 +8,18 @@
       <template #header>
         <div class="card-header">
           <span>文件列表</span>
-          <el-button class="button" @click="fresh">刷新</el-button>
+          <span>
+            <el-button class="button" @click="batDel">批量删除</el-button>
+            <el-button class="button" @click="fresh">刷新</el-button>
+          </span>
         </div>
       </template>
-      <el-table :data="list" style="width: 100%">
+      <el-table
+        @selection-change="onSelectionChange"
+        :data="list"
+        style="width: 100%"
+      >
+        <el-table-column type="selection" width="40" />
         <el-table-column prop="file" label="文件名" />
         <el-table-column prop="size" label="大小" />
         <el-table-column label="操作" width="120">
@@ -40,6 +48,7 @@ export default {
   data() {
     return {
       list: [],
+      selected: [],
     };
   },
   mounted() {
@@ -54,7 +63,7 @@ export default {
     upload() {
       const file = this.$refs.file;
       if (file.files[0]) {
-        uploadFile(file.files[0]).then(()=>{
+        uploadFile(file.files[0]).then(() => {
           setTimeout(this.fresh, 1000);
         });
       } else {
@@ -63,9 +72,31 @@ export default {
     },
     delFile(item) {
       confirmDelete().then(() => {
-        deleteFile(item.file).then(()=>{
+        deleteFile(item.file).then(() => {
           setTimeout(this.fresh, 1000);
         });
+      });
+    },
+    onSelectionChange(selected) {
+      this.selected = selected;
+    },
+    batDel() {
+      const list = this.selected;
+      if (list.length < 1) {
+        return ElMessage.error("请勾选文件");
+      }
+      confirmDelete().then(() => {
+        this.selected = [];
+        const fresh = () => setTimeout(this.fresh, 1000);
+        function loopDelete() {
+          if (list.length < 1) {
+            fresh();
+            return;
+          }
+          const item = list.shift();
+          deleteFile(item.file).finally(loopDelete);
+        }
+        loopDelete();
       });
     },
   },

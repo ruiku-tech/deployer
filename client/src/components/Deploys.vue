@@ -89,7 +89,7 @@
         style="width: 100%"
         @selection-change="onSelectionChange"
       >
-        <el-table-column type="selection" width="55" />
+        <el-table-column type="selection" width="40" />
         <el-table-column prop="name" label="脚本名字">
           <template #header>
             <div class="header-with-filter">
