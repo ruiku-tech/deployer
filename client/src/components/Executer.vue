@@ -53,12 +53,16 @@
         </el-form-item>
       </el-form>
     </div>
+    <div class="panel" style="margin-top: 10px">
+      <div class="title">api接口自动化</div>
+      <el-button type="primary" @click="api()">开始</el-button>
+    </div>
   </div>
 </template>
 
 <script>
 import { ElMessage } from "element-plus";
-import { fetchHosts, run, deploySSL } from "../api";
+import { fetchHosts, run, deploySSL, apiAuto } from "../api";
 import dataCenter from "../dataCenter";
 export default {
   name: "executer",
@@ -118,9 +122,11 @@ export default {
       const env = dataCenter.env.value;
       return localStorage.getItem(`${env}-domain`) || "";
     },
+    api() {
+      apiAuto(dataCenter.env.value);
+    },
   },
 };
 </script>
 
-<style>
-</style>
+<style></style>

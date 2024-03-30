@@ -8,6 +8,7 @@ const executer = require("./executer");
 const envRouter = require("./env.router");
 const cert = require("./cert");
 const utils = require("./utils");
+const apiAuto = require("./api/index");
 
 var multer = require("multer");
 const storage = multer.diskStorage({
@@ -331,4 +332,8 @@ router.post("/deploy-ssl", (req, res) => {
     });
 });
 
+router.get("/api_auto", (req, res) => {
+  apiAuto.init(req.query.env);
+  res.end();
+});
 module.exports = router;
