@@ -215,6 +215,34 @@ function autoLogin() {
     autoLoginReq
   );
 }
+/** 过期token */
+function expiredLogin() {
+  const autoLoginReq = {
+    name: "过期token",
+    json: {
+      freshToken:
+        "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MDAwNDMwMDUsInVzZXJJZCI6NywiaWF0IjoxNzAwMDQxMjA1fQ.eFCDYrjcLHH9RQDPm48V-02gOy6J7m7Ogx-_4FXBV_k",
+    },
+  };
+  return makeHttpRequest(
+    configOptions("/v1/user/autoLogin", "POST"),
+    autoLoginReq
+  );
+}
+/** 过期token */
+function errLogin() {
+  const autoLoginReq = {
+    name: "错误token",
+    json: {
+      freshToken:
+        "J0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MDAwNDMwMDUsInVzZXJJZCI6NywiaWF0IjoxNzAwMDQxMjA1fQ.eFCDYrjcLHH9RQDPm48V-02gOy6J7m7Ogx-_4FXBV_k",
+    },
+  };
+  return makeHttpRequest(
+    configOptions("/v1/user/autoLogin", "POST"),
+    autoLoginReq
+  );
+}
 /** 用户信息 */
 /**获取用户档案 */
 function getUserInformation() {
@@ -500,4 +528,6 @@ module.exports = {
   loginGame: loginGame,
   getGameUrl: getGameUrl,
   selectGame: selectGame,
+  expiredLogin: expiredLogin,
+  errLogin: errLogin,
 };
