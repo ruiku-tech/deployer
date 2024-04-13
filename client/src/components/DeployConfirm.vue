@@ -45,6 +45,7 @@
 <script>
 import { ElMessage } from "element-plus";
 import { deploy, fetchFiles, fetchScript } from "../api";
+import { prodConfirm } from "../utils"
 export default {
   name: "deploy-confirm",
   props: ["list"],
@@ -119,7 +120,7 @@ export default {
         ret[item.name] = item.value;
         return ret;
       }, {});
-      deploy(this.list, files).then(this.close);
+      prodConfirm().then(()=>deploy(this.list, files).then(this.close)).catch()
     },
   },
 };

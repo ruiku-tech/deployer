@@ -4,6 +4,7 @@
     <Spliter />
     <Logger />
     <EnvSwitch />
+    <Confirm />
   </div>
 </template>
 
@@ -12,6 +13,8 @@ import Logger from "./components/Logger.vue";
 import Operator from "./components/Operator.vue";
 import Spliter from './components/Spliter.vue';
 import EnvSwitch from "./components/EnvSwitch.vue";
+import Confirm from "./components/Confirm.vue";
+
 
 export default {
   name: "App",
@@ -19,7 +22,8 @@ export default {
     Logger,
     Operator,
     Spliter,
-    EnvSwitch
+    EnvSwitch,
+    Confirm
   },
 };
 </script>
