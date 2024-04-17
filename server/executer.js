@@ -140,6 +140,7 @@ function resolveExpress(scriptContent, from) {
   const fileDir = this.fileDir;
   const configDir = this.configDir;
   const tempDir = this.tempDir;
+  const server = this.server;
   // 替换文件路径、服务器名字、配置（并更换配置里面的东西）
   const dynamics = scriptContent.match(regExp);
   if (dynamics) {
@@ -176,6 +177,8 @@ function resolveExpress(scriptContent, from) {
       } else if (key === HOST_TYPE) {
         if (hosts[value]) {
           ret[item] = { data: hosts[value].host };
+        } else if(value==="$SELF"){
+          ret[item] = { data: server.host };
         } else {
           ret[item] = { err: `服务器[${value}]不存在` };
         }
@@ -220,7 +223,7 @@ function cmdEval(script, register) {
 // "AAAA$[0],$[1]"
 function resolveStack(cmd, stack) {
   return cmd.replace(/\$\[(\d+?)\]/g, ($0, $1) => {
-    return stack[stack.length - 1 - $1] || '';
+    return stack[stack.length - 1 - $1] || "";
   });
 }
 function updateVars(item) {
@@ -247,7 +250,7 @@ function parse(list) {
       const script = item.cmds[i];
       const filePath = path.resolve(scriptDir, script);
       let scriptContent = fs.readFileSync(filePath, "utf-8");
-      const ret = resolveExpress.call(this, scriptContent, {});
+      const ret = resolveExpress.call({ ...this, server }, scriptContent, {});
       if (ret.err) {
         return ret;
       }
