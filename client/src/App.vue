@@ -1,5 +1,6 @@
 <template>
   <div class="main">
+    <!-- <Login></Login> -->
     <Operator />
     <Spliter />
     <Logger />
@@ -10,8 +11,9 @@
 <script>
 import Logger from "./components/Logger.vue";
 import Operator from "./components/Operator.vue";
-import Spliter from './components/Spliter.vue';
+import Spliter from "./components/Spliter.vue";
 import EnvSwitch from "./components/EnvSwitch.vue";
+// import Login from "./components/Login.vue";
 
 export default {
   name: "App",
@@ -19,7 +21,8 @@ export default {
     Logger,
     Operator,
     Spliter,
-    EnvSwitch
+    EnvSwitch,
+    // Login,
   },
 };
 </script>
@@ -56,7 +59,7 @@ body {
   background: #f0f0f0;
   border-radius: 4px;
 }
-.panel .title{
+.panel .title {
   height: 40px;
   font-size: 20px;
   line-height: 40px;
@@ -71,7 +74,7 @@ body {
   margin: 1px;
   line-height: 1.2;
 }
-.center{
+.center {
   display: flex;
   justify-content: center;
   align-items: center;
