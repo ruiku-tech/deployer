@@ -1,43 +1,32 @@
 <template>
-  <el-row justify="center">
-    <el-col :span="8">
-      <!-- 注册表单 -->
-      <el-form
-        ref="registerForm"
-        :model="registerForm"
-        label-width="80px"
-        class="demo-register-form"
-      >
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="registerForm.username"></el-input>
-        </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input type="password" v-model="registerForm.password"></el-input>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleRegister">注册</el-button>
-        </el-form-item>
-      </el-form>
-
-      <!-- 登录表单 -->
-      <el-form
-        ref="loginForm"
-        :model="loginForm"
-        label-width="80px"
-        class="demo-login-form"
-      >
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="loginForm.username"></el-input>
-        </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input type="password" v-model="loginForm.password"></el-input>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleLogin">登录</el-button>
-        </el-form-item>
-      </el-form>
-    </el-col>
-  </el-row>
+  <div class="login">
+    <div class="content">
+      <h1 class="title">部署平台管理系统</h1>
+      <el-card class="box-card">
+        <el-tabs v-model="loginModel" @tab-click="handleClick">
+          <el-tab-pane label="登陆" name="0">登陆</el-tab-pane>
+          <el-tab-pane label="注册" name="1">注册</el-tab-pane>
+        </el-tabs>
+        <el-form ref="registerForm" :model="registerForm" label-width="60px">
+          <el-form-item label="用户名:" prop="username">
+            <el-input v-model="registerForm.username"></el-input>
+          </el-form-item>
+          <el-form-item label="密码:" prop="password">
+            <el-input
+              type="password"
+              v-model="registerForm.password"
+            ></el-input>
+          </el-form-item>
+          <el-button
+            style="width: 100%"
+            type="primary"
+            @click="handleRegister"
+            >{{ loginModel == "0" ? "登陆" : "注册" }}</el-button
+          >
+        </el-form>
+      </el-card>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -45,6 +34,7 @@ export default {
   name: "operator",
   data() {
     return {
+      loginModel: "0",
       registerForm: {
         username: "",
         password: "",
@@ -77,11 +67,23 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
-#operator {
-  flex: 1;
+.login {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
-.info {
-  font-size: 20px;
-  height: 100%;
+.content {
+  overflow: hidden;
+}
+.box-card {
+  padding: 30px;
+}
+.title {
+  margin-bottom: 50px;
+}
+:deep(.el-tabs__content) {
+  display: none;
 }
 </style>
