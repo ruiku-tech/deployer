@@ -50,7 +50,10 @@ class ApiTester {
         return resp.data;
       } else {
         broadcast.cast(`:验证异常：${name}(${route}),${resp.data.code}`);
-        return Promise.reject(resp.data);
+        return Promise.reject({
+          message: `${name}响应异常:${resp.data.code}`,
+          data: resp.data,
+        });
       }
     } catch (error) {
       broadcast.cast(`ERR:验证异常：${name}(${route}),${error.message}`);
