@@ -19,9 +19,13 @@ function init(server) {
   });
 }
 function cast(msg) {
-  clients.forEach((ws) => {
-    ws.send(msg);
-  });
+  if (global.isTest) {
+    console.log(msg);
+  } else {
+    clients.forEach((ws) => {
+      ws.send(msg);
+    });
+  }
 }
 
 module.exports = {
