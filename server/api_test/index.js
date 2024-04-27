@@ -51,7 +51,7 @@ class ApiTester {
       } else {
         broadcast.cast(`:验证异常：${name}(${route}),${resp.data.code}`);
         return Promise.reject({
-          message: `${name}响应异常:${resp.data.code}`,
+          message: `${name}响应异常:${JSON.stringify(resp.data)}`,
           data: resp.data,
         });
       }
@@ -71,7 +71,7 @@ class ApiTester {
         return resp.data;
       } else {
         return Promise.reject({
-          message: `${name}响应异常:${resp.data.code}`,
+          message: `${name}响应异常:${JSON.stringify(resp.data)}`,
           data: resp.data,
         });
       }
