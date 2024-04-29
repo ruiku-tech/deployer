@@ -130,12 +130,6 @@ function popularizes() {
     name: "玩九宫格",
   });
 }
-/** 领取奖励 */
-function receiveReward() {
-  return makeHttpRequest(configOptions("/v1/popularize/receiveReward", "GET"), {
-    name: "领取奖励",
-  });
-}
 /** 查询记录 */
 function getUserInviteUser() {
   return makeHttpRequest(
@@ -144,6 +138,12 @@ function getUserInviteUser() {
       name: "查询记录",
     }
   );
+}
+/** 领取奖励 */
+function receiveReward() {
+  return makeHttpRequest(configOptions("/v1/popularize/receiveReward", "GET"), {
+    name: "领取奖励",
+  });
 }
 /** 火箭游戏 */
 function playGameRocket(targetRate, betAmount) {

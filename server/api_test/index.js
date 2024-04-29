@@ -10,10 +10,19 @@ function generateSign() {
   const sign = hash.digest("hex") + "-" + Date.now().toString(16);
   return sign;
 }
-
 // 引入各个模块
 const Website = require("./modules/website");
 const User = require("./modules/user");
+const GameHistory = require("./modules/gameHistory");
+const Wallet = require("./modules/wallet");
+const WS = require("./modules/webSocket");
+const GirdNine = require("./modules/girdNine");
+const originais = require("../api/unitTesting/originais");
+const Originais = require("./modules/originais");
+const Wheel = require("./modules/wheel");
+const RedEnvelopeRain = require("./modules/redEnvelopeRain");
+const Cashback = require("./modules/cashback");
+const ReentryReward = require("./modules/reentryReward");
 
 class ApiTester {
   headers = {};
@@ -26,6 +35,15 @@ class ApiTester {
     this.config = config;
     new Website(this);
     new User(this);
+    // new Wheel(this);
+    // new WS(this);
+    // new GameHistory(this);
+    // new Wallet(this);
+    // new GirdNine(this);
+    // new Originais(this);
+    // new RedEnvelopeRain(this);
+    // new Cashback(this);
+    new ReentryReward(this);
   }
 
   /**注册 */
@@ -35,7 +53,7 @@ class ApiTester {
   updateHeader(key, value) {
     this.headers[key] = value;
   }
-  updateData(key, value){
+  updateData(key, value) {
     this.data[key] = value;
   }
 
@@ -44,7 +62,11 @@ class ApiTester {
     try {
       broadcast.cast(`:开始验证：${name}`);
       const resp = await axios.post(url, params, {
-        Headers: { ...this.headers, sign: generateSign() },
+        headers: {
+          ...this.headers,
+          sign: generateSign(),
+          // auth: this.data["freshToken"],
+        },
       });
       if (resp.data.code === 200) {
         return resp.data;
@@ -62,7 +84,11 @@ class ApiTester {
     try {
       broadcast.cast(`:开始验证：${name}`);
       const resp = await axios.get(`${url}?${qs.stringify(query)}`, {
-        Headers: { ...this.headers, sign: generateSign() },
+        headers: {
+          ...this.headers,
+          sign: generateSign(),
+          // auth: this.data["freshToken"],
+        },
       });
       if (resp.data.code === 200) {
         return resp.data;
