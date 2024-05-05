@@ -404,7 +404,7 @@ async function deployList(list) {
 }
 
 function run(server, cmd) {
-  return deply.call(this, { server, cmds: [cmd] });
+  return deply.call(this, { server, cmds: cmd.split("\n").filter(c=>c) });
 }
 
 function getDeployings() {
@@ -432,4 +432,5 @@ module.exports = {
   run,
   getDeployings,
   stopDeploy,
+  resolveExpress,
 };

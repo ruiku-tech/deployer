@@ -290,8 +290,17 @@ router.post("/run", (req, res) => {
   if (!server) {
     return res.send({ err: `找不到服务器:${req.body.server}` });
   }
+  const vars = utils.parseVars.call(req.context);
+  const context = Object.assign(
+    { vars, hosts, files: req.body.files,server },
+    req.context
+  );
+  const ret = executer.resolveExpress.call(context,req.body.cmd,{})
+  if(ret.err){
+    return res.send({ err: ret.err });
+  }
   executer.run
-    .call(req.context, server, req.body.cmd)
+    .call(req.context, server, ret.data)
     .then(() => {
       res.send({ data: "success" });
     })
