@@ -1,6 +1,6 @@
 <template>
-  <div class="main">
-    <!-- <Login></Login> -->
+  <Login v-show="!dataCenter.user"></Login>
+  <div class="main" v-show="dataCenter.user">
     <Operator />
     <Spliter />
     <Logger />
@@ -13,16 +13,28 @@ import Logger from "./components/Logger.vue";
 import Operator from "./components/Operator.vue";
 import Spliter from "./components/Spliter.vue";
 import EnvSwitch from "./components/EnvSwitch.vue";
-// import Login from "./components/Login.vue";
+import Login from "./components/Login.vue";
+import dataCenter from "./dataCenter";
 
 export default {
   name: "App",
+  data() {
+    return {
+      dataCenter,
+    };
+  },
   components: {
     Logger,
     Operator,
     Spliter,
     EnvSwitch,
-    // Login,
+    Login,
+  },
+  mounted() {
+    const user = localStorage.getItem("user");
+    if (user) {
+      dataCenter.user.value = user;
+    }
   },
 };
 </script>
@@ -49,6 +61,7 @@ body {
   padding: 10px;
   flex-direction: row;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;

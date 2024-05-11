@@ -23,6 +23,7 @@ const Wheel = require("./modules/wheel");
 const RedEnvelopeRain = require("./modules/redEnvelopeRain");
 const Cashback = require("./modules/cashback");
 const ReentryReward = require("./modules/reentryReward");
+const Referee = require("./modules/referee");
 
 class ApiTester {
   headers = {};
@@ -34,16 +35,17 @@ class ApiTester {
   constructor(config) {
     this.config = config;
     new Website(this);
+    new Wheel(this);
     new User(this);
-    // new Wheel(this);
-    // new WS(this);
-    // new GameHistory(this);
-    // new Wallet(this);
-    // new GirdNine(this);
-    // new Originais(this);
-    // new RedEnvelopeRain(this);
-    // new Cashback(this);
+    new WS(this);
+    new GameHistory(this);
+    new Wallet(this);
+    new GirdNine(this);
+    new Originais(this);
+    new RedEnvelopeRain(this);
+    new Cashback(this);
     new ReentryReward(this);
+    new Referee(this);
   }
 
   /**注册 */
@@ -105,9 +107,13 @@ class ApiTester {
   }
 
   async run() {
-    for (let index = 0; index < this.modules.length; index++) {
-      const element = this.modules[index];
-      await element.start();
+    try {
+      for (let index = 0; index < this.modules.length; index++) {
+        const element = this.modules[index];
+        await element.start();
+      }
+    } catch (error) {
+      console.log(error);
     }
   }
 }

@@ -5,9 +5,9 @@
         <el-tab-pane label="文件管理" name="files"
           ><Files ref="files"
         /></el-tab-pane>
-        <el-tab-pane label="发布记录" name="record"
-          ><Record ref="record"
-        /></el-tab-pane>
+        <el-tab-pane label="发布记录" name="record">
+          <Record ref="record" />
+        </el-tab-pane>
         <el-tab-pane label="全局变量" name="vars"
           ><Vars ref="vars"
         /></el-tab-pane>

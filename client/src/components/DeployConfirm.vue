@@ -4,8 +4,10 @@
       <el-table-column prop="name" label="组合名字" width="150" />
       <el-table-column label="命令详情">
         <template #default="scope">
-          <div class="compose" v-for="(item,i) in scope.row.cmd" :key="i">
-            <div class="cmd-reverse" v-for="(c,j) in item" :key="j">{{ c }}</div>
+          <div class="compose" v-for="(item, i) in scope.row.cmd" :key="i">
+            <div class="cmd-reverse" v-for="(c, j) in item" :key="j">
+              {{ c }}
+            </div>
           </div>
         </template>
       </el-table-column>
@@ -43,8 +45,9 @@
 </template>
 
 <script>
-import { ElMessage } from "element-plus";
+import { ElMessage, dayjs } from "element-plus";
 import { deploy, fetchFiles, fetchScript } from "../api";
+import dataCenter from "../dataCenter";
 export default {
   name: "deploy-confirm",
   props: ["list"],
@@ -68,17 +71,19 @@ export default {
     },
     async init() {
       // [{name:string,host:string,cmds:string[]}]
-      const scriptList = await this.list.map((item) => {
-        return Promise.all(
-          item.cmds.map((scriptName) => fetchScript(scriptName))
-        );
-      });
+      const scriptList = await Promise.all(
+        this.list.map((item) => {
+          return Promise.all(
+            item.cmds.map((scriptName) => fetchScript(scriptName))
+          );
+        })
+      );
       const fileMap = {};
       const errors = [];
       Promise.all(scriptList).then((list) => {
         this.details = this.list.map((item, index) => ({
           name: item.name,
-          cmd: list[index].map(c=>c.split('\n')),
+          cmd: list[index].map((c) => c.split("\n")),
         }));
         list.forEach((scripts, index) => {
           scripts.forEach((item) => {
@@ -109,6 +114,10 @@ export default {
       this.$emit("close");
     },
     run() {
+      this.list.forEach(function (item) {
+        item.username = dataCenter.user;
+        item.time = dayjs().format("YYYY-MM-DD HH:mm:ss");
+      });
       const emptys = this.form.files.filter((item) => !item.value);
       if (emptys.length) {
         return ElMessage.error(
@@ -126,11 +135,11 @@ export default {
 </script>
 
 <style>
-.compose{
+.compose {
   border: 1px solid #999;
   padding: 1px;
 }
-.compose:not(:first-child){
+.compose:not(:first-child) {
   border-top: none;
 }
 .cmd-reverse {

@@ -17,23 +17,23 @@ class Website {
         "站点配置",
         "/v1/global/getCurrencyAndNetwork"
       );
-      if(data.data.cryptoNetworks.length<1){
+      if (data.data.cryptoNetworks.length < 1) {
         broadcast.cast(`ERR:站点配置网络列表缺失`);
         return Promise.reject(error);
       }
-      if(data.data.cryptoCurrencies.length<1){
+      if (data.data.cryptoCurrencies.length < 1) {
         broadcast.cast(`ERR:站点配置货币列表缺失`);
         return Promise.reject(error);
       }
-      if(data.data.levelConfigs.length<1){
+      if (data.data.levelConfigs.length < 1) {
         broadcast.cast(`ERR:站点配置等级列表缺失`);
         return Promise.reject(error);
       }
-      if(!data.data.profitRate){
+      if (!data.data.profitRate) {
         broadcast.cast(`ERR:站点配置profitRate缺失`);
         return Promise.reject(error);
       }
-      if(!data.data.time){
+      if (!data.data.time) {
         broadcast.cast(`ERR:站点配置time缺失`);
         return Promise.reject(error);
       }

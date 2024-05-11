@@ -7,3 +7,6 @@ export * from "./bats";
 export * from "./deploys";
 export * from "./envs";
 export * from "./apiAuto";
+export * from "./register";
+export * from "./login";
+export * from "./recordList";

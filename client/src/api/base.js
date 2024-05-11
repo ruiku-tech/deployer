@@ -58,7 +58,7 @@ service.interceptors.response.use(
   (err) => {
     endLoad();
     ElMessage.error(err.message);
-    return new Promise(()=>{});
+    return new Promise(() => {});
   }
 );
 

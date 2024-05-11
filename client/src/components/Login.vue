@@ -17,12 +17,9 @@
               v-model="registerForm.password"
             ></el-input>
           </el-form-item>
-          <el-button
-            style="width: 100%"
-            type="primary"
-            @click="handleRegister"
-            >{{ loginModel == "0" ? "登陆" : "注册" }}</el-button
-          >
+          <el-button style="width: 100%" type="primary" @click="submit">{{
+            loginModel == "0" ? "登陆" : "注册"
+          }}</el-button>
         </el-form>
       </el-card>
     </div>
@@ -30,6 +27,9 @@
 </template>
 
 <script>
+import { ElMessage } from "element-plus";
+import { register, login } from "../api";
+import dataCenter from "../dataCenter";
 export default {
   name: "operator",
   data() {
@@ -47,25 +47,30 @@ export default {
   },
   components: {},
   methods: {
-    // 处理注册
-    handleRegister() {
-      // 在这里执行注册逻辑，可以向后端发送注册请求
-      console.log("注册信息:", this.registerForm);
-      // 这里仅做示例，清空注册表单
-      this.$refs.registerForm.resetFields();
-    },
-    // 处理登录
-    handleLogin() {
-      // 在这里执行登录逻辑，可以向后端发送登录请求
-      console.log("登录信息:", this.loginForm);
-      // 这里仅做示例，清空登录表单
-      this.$refs.loginForm.resetFields();
+    submit() {
+      if (this.loginModel == "0") {
+        login(this.registerForm.username, this.registerForm.password).then(
+          (data) => {
+            localStorage.setItem("user", data);
+            dataCenter.user.value = data;
+          }
+        );
+      } else {
+        register(this.registerForm.username, this.registerForm.password).then(
+          (data) => {
+            console.log(data, ">?");
+            if (data == "sccess") {
+              ElMessage.success("注册成功");
+              this.loginModel = "0";
+            }
+          }
+        );
+      }
     },
   },
 };
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
 .login {
   width: 100%;

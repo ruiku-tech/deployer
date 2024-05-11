@@ -19,8 +19,10 @@ class ReentryReward {
       console.log(data);
       if (!data.data) {
         broadcast.cast(`ERR:该用户并非老玩家`);
-      } else if (data.data.canPlay == false) {
-        broadcast.cast(`ERR:本轮已经玩过红包雨`);
+      } else if (!data.data.config) {
+        broadcast.cast(`ERR:配置获取失败`);
+      } else if (!data.data.expireTime) {
+        broadcast.cast(`ERR:expireTime字段获取失败`);
       } else {
         broadcast.cast(`:获取用户是否为老玩家验证通过`);
       }

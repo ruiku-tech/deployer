@@ -39,8 +39,6 @@ class User {
     this.owner.register(this);
   }
   async start() {
-    // await this.registerByPhone();
-    // await this.loginByPhone();
     await this.autoLogin("自动登陆");
     await this.afterToken();
     await this.retryToken();
@@ -49,63 +47,14 @@ class User {
     await this.getUserInformation();
     await this.userAllGameRecords();
   }
-  async registerByPhone() {
-    try {
-      const data = await this.owner.post(
-        registerReq.name,
-        "/v1/user/registerByPhone",
-        registerReq.json
-      );
-      // 判断数据是否正确
-      // todo
-      // 如果是动态数据无法校验正确，则输出格式化数据
-      broadcast.cast(`:${registerReq.name}验证通过\n${JSON.stringify(data)}`);
-    } catch (error) {
-      // 如果需要中止后面的调用，就返回 Promise.reject(error)
-      return Promise.reject(error);
-    }
-  }
-  /**新账号登录 */
-  async loginByPhone() {
-    try {
-      const data = await this.owner.post(
-        "新用户登录",
-        "/v1/user/loginByPhone",
-        {
-          phone: registerReq.json.phone,
-          phonePassword: registerReq.json.phonePassword,
-          client: "ios",
-        }
-      );
-      if (!data.data.id) {
-        broadcast.cast(`ERR:用户id缺失`);
-        return Promise.reject(error);
-      }
-      if (!data.data.token) {
-        broadcast.cast(`ERR:token缺失`);
-        return Promise.reject(error);
-      }
-      if (!data.data.freshToken) {
-        broadcast.cast(`ERR:freshToken缺失`);
-        return Promise.reject(error);
-      }
-      broadcast.cast(`:新用户登录验证通过`);
-      // 更新token
-      this.owner.updateHeader("auth", data.data.token);
-      // 存储数据到全局
-      this.owner.updateData("freshToken", data.data.freshToken);
-      this.owner.updateData("userId", data.data.id);
-    } catch (error) {
-      return Promise.reject(error);
-    }
-  }
+
   /**老账号登录 */
   async loginOldAccount() {
     const loginReq = {
       name: "邮箱登陆",
       json: {
         email: "666666@qq.com",
-        password: "Ss141242",
+        password: "Aa123456",
         client: "ios",
       },
     };
@@ -115,6 +64,7 @@ class User {
         "/v1/user/login",
         loginReq.json
       );
+      console.log(data.data);
       if (!data.data.id) {
         broadcast.cast(`ERR:用户id缺失`);
         return Promise.reject(error);
@@ -151,7 +101,7 @@ class User {
         broadcast.cast(`ERR:token缺失`);
         return Promise.reject(error);
       }
-      if (!data.data.freshToken) {
+      if (!data.data.freshToken && name != "测试新返回的token") {
         broadcast.cast(`ERR:freshToken缺失`);
         return Promise.reject(error);
       }

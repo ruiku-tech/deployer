@@ -11,6 +11,8 @@ const utils = require("./utils");
 const apiAuto = require("./api/index");
 
 var multer = require("multer");
+const { log } = require("console");
+const { isObjectEqual } = require("./record");
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, req.context.fileDir); // 上传文件的存储路径
@@ -94,6 +96,7 @@ router.get("/hosts", (req, res) => {
 });
 // 获取服务器列表
 router.post("/hosts", (req, res) => {
+  console.log(req.context.hostsFile);
   fs.writeFile(
     req.context.hostsFile,
     JSON.stringify(req.body.data, null, 2),
@@ -256,6 +259,7 @@ router.get("/deploys", (req, res) => {
 router.post("/deploy", (req, res) => {
   // [{name:string,host:string,cmds:string[]}]
   let list = req.body.list;
+  const recordList = list;
   if (!list || !list.length) {
     return res.send({ err: "请选择部署的脚本" });
   }
@@ -273,12 +277,29 @@ router.post("/deploy", (req, res) => {
     });
   }
   // 记录部署记录
+  // fs.writeFile(
+  //   path.resolve(
+  //     req.context.deployDir,
+  //     `${dayjs().format("YYYYMMDD-HH:mm:ss")}.txt`
+  //   ),
+  //   JSON.stringify(list, null, 2),
+  //   "utf-8",
+  //   () => {}
+  // );
+  let record = [];
+  try {
+    const data = fs.readFileSync(
+      path.resolve(req.context.deployDir, `record.txt`),
+      "utf8"
+    );
+    if (data) {
+      record = JSON.parse(data);
+    }
+  } catch (err) {}
+  record.push(...recordList);
   fs.writeFile(
-    path.resolve(
-      req.context.deployDir,
-      `${dayjs().format("YYYYMMDD-HH:mm:ss")}.txt`
-    ),
-    JSON.stringify(list, null, 2),
+    path.resolve(req.context.deployDir, `record.txt`),
+    JSON.stringify(record, null, 2),
     "utf-8",
     () => {}
   );
@@ -333,7 +354,146 @@ router.post("/deploy-ssl", (req, res) => {
 });
 
 router.get("/api_auto", (req, res) => {
-  apiAuto.init(req.query.env);
+  // apiAuto.init(req.query.host);
+  try {
+    console.log({
+      host: `${req.query.host}:${req.query.port}`,
+      prefix: `${req.query.prefix}`,
+    });
+    const ApiTester = require("./api_test/index");
+    global.isTest = false;
+    new ApiTester({
+      host: `${req.query.host}:${req.query.port}`,
+      prefix: `${req.query.prefix}`,
+    }).run();
+  } catch (error) {
+    console.log(error);
+  }
   res.end();
+});
+
+// 注册
+router.post("/register", (req, res) => {
+  // 检查文件是否存在
+  if (!fs.existsSync(req.context.userFile)) {
+    // 如果文件不存在，创建一个空文件
+    fs.writeFileSync(req.context.userFile, "", "utf8");
+  }
+  // 读取文件
+  fs.readFile(req.context.userFile, "utf8", (err, data) => {
+    let jsonData;
+    if (data) {
+      try {
+        jsonData = JSON.parse(data);
+      } catch (parseError) {
+        jsonData = [];
+        return;
+      }
+    } else {
+      jsonData = [];
+    }
+    const exist = jsonData.some(function (user) {
+      return user.username === req.body.username;
+    });
+    if (exist) {
+      return res.send({ err: "用户名已注册" });
+    }
+    let userId;
+    if (jsonData.length > 0) {
+      userId = jsonData[jsonData.length - 1].userId + 1;
+    } else {
+      userId = 0;
+    }
+    jsonData.push({
+      userId: userId,
+      username: req.body.username,
+      password: req.body.password,
+    });
+    fs.writeFile(
+      req.context.userFile,
+      JSON.stringify(jsonData, { recursive: true }, 2),
+      "utf-8",
+      (err) => {
+        if (err) {
+          res.send({ err });
+        } else {
+          res.send({ data: "sccess" });
+        }
+      }
+    );
+  });
+});
+// 登陆
+router.post("/login", (req, res) => {
+  // 检查文件是否存在
+  if (!fs.existsSync(req.context.userFile)) {
+    // 如果文件不存在，创建一个空文件
+    fs.writeFileSync(req.context.userFile, "", "utf8");
+  }
+  // 读取文件
+  fs.readFile(req.context.userFile, "utf8", (err, data) => {
+    let jsonData;
+    if (data) {
+      try {
+        jsonData = JSON.parse(data);
+      } catch (parseError) {
+        jsonData = [];
+        return;
+      }
+    } else {
+      jsonData = [];
+    }
+    const exist = jsonData.find(function (account) {
+      return (
+        account.username === req.body.username &&
+        account.password === req.body.password
+      );
+    });
+    if (exist) {
+      res.send({ data: req.body.username });
+    } else {
+      res.send({ err: { code: "用户名或密码错误" } });
+    }
+  });
+});
+// 记录列表
+router.get("/recordList", (req, res) => {
+  const userName = req.query.username;
+  let recordList = [];
+  try {
+    const data = fs.readFileSync(
+      path.resolve(req.context.deployDir, `record.txt`),
+      "utf8"
+    );
+    if (data) {
+      recordList = JSON.parse(data).filter(
+        (record) => record.username === userName
+      );
+    }
+  } catch (err) {}
+  res.send({ data: recordList });
+});
+//删除记录数据
+router.post("/recordDelete", (req, res) => {
+  fs.readFile(
+    path.resolve(req.context.deployDir, `record.txt`),
+    "utf-8",
+    (err, data) => {
+      let json = JSON.parse(data);
+      json = json.filter((item) => !isObjectEqual(item, req.body.item));
+      fs.writeFile(
+        path.resolve(req.context.deployDir, `record.txt`),
+        JSON.stringify(json),
+        "utf-8",
+        (err) => {
+          if (err) {
+            res.send({ err });
+          } else {
+            res.send({ data: "success" });
+          }
+        }
+      );
+    }
+  );
 });
 module.exports = router;
