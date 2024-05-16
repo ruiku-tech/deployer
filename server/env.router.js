@@ -1,8 +1,8 @@
 var express = require("express");
 var router = express.Router();
 const install = require("./install");
-const path = require("path")
-const fs = require("fs")
+const path = require("path");
+const fs = require("fs");
 
 // 获取环境列表
 router.get("/list", (req, res) => {

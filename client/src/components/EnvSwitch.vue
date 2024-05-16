@@ -30,7 +30,7 @@
 </template>
 
 <script>
-import { fetchEnvs, saveEnv, deleteEnv } from "../api";
+import { fetchEnvs, saveEnv, deleteEnv, aaa } from "../api";
 import dataCenter from "../dataCenter";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { confirmDelete } from "../utils";
@@ -50,6 +50,7 @@ export default {
     fresh() {
       fetchEnvs().then((resp) => {
         this.list = resp;
+        dataCenter.envList.value = resp;
       });
     },
     changeEnv(env) {

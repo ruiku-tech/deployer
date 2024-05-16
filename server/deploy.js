@@ -4,12 +4,12 @@ const fs = require("fs");
 const path = require("path");
 const dayjs = require("dayjs");
 const bodyParser = require("body-parser");
-const executer = require("./executer");
+// const executer = require("./executer");
 const envRouter = require("./env.router");
 const cert = require("./cert");
 const utils = require("./utils");
 const apiAuto = require("./api/index");
-
+const broadcast = require("./broadcast");
 var multer = require("multer");
 const { log } = require("console");
 const { isObjectEqual } = require("./record");
@@ -26,7 +26,6 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
 });
-
 router.use(bodyParser.json());
 
 router.use("/env", envRouter);
@@ -259,6 +258,7 @@ router.get("/deploys", (req, res) => {
 router.post("/deploy", (req, res) => {
   // [{name:string,host:string,cmds:string[]}]
   let list = req.body.list;
+  const env = req.body.env;
   const recordList = list;
   if (!list || !list.length) {
     return res.send({ err: "请选择部署的脚本" });
@@ -304,7 +304,7 @@ router.post("/deploy", (req, res) => {
     () => {}
   );
   res.send({ data: "success" });
-  executer.deployList.call(context, list);
+  executer.deployList.call(context, env, list);
 });
 router.post("/run", (req, res) => {
   const hosts = utils.parseHosts.call(req.context);

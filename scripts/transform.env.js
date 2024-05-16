@@ -17,7 +17,6 @@ const scriptDir = path.resolve(dir, "scripts");
 const batDir = path.resolve(dir, "bats");
 const tempDir = path.resolve(dir, "temp");
 const deployDir = path.resolve(dir, "./deploys");
-
 exec(`cp -rf "${varsFile}" ${context.varsFile}`, (error, stdout, stderr) => {
   if (error) {
     return console.log(`${varsFile},failed!!`, error.message);

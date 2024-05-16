@@ -2,6 +2,14 @@
   <div class="right">
     <div class="deploying">
       <div class="title">部署中</div>
+      <el-checkbox-group v-model="envList">
+        <el-checkbox-button
+          v-for="env in dataCenter.envList"
+          :label="env"
+          :key="env"
+          >{{ env.name }}</el-checkbox-button
+        >
+      </el-checkbox-group>
       <div class="list">
         <el-tag
           v-for="deploying in deployings"
@@ -19,14 +27,16 @@
 
 <script>
 import { getDeployings, stopDeploy } from "../api";
+import dataCenter from "../dataCenter";
 import { confirmDelete } from "../utils";
 import dayjs from "dayjs";
-
 export default {
   name: "logger",
   data() {
     return {
       deployings: [],
+      dataCenter,
+      envList: [dataCenter.env.value],
     };
   },
   mounted() {
@@ -90,7 +100,9 @@ export default {
       var line = document.createElement("pre");
       line.className = `item ${log[0]}`;
       if (log[0] === "NORM") {
-        line.textContent = `${log.slice(1).join(":")} @${dayjs().format('MM-DD hh:mm:ss')}`;
+        line.textContent = `${log.slice(1).join(":")} @${dayjs().format(
+          "MM-DD hh:mm:ss"
+        )}`;
       } else {
         line.textContent = log.slice(1).join(":");
       }

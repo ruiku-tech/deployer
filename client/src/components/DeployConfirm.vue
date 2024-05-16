@@ -128,7 +128,7 @@ export default {
         ret[item.name] = item.value;
         return ret;
       }, {});
-      deploy(this.list, files).then(this.close);
+      deploy(this.list, dataCenter.env, files).then(this.close);
     },
   },
 };
