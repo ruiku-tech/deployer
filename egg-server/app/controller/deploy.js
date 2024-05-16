@@ -1,10 +1,10 @@
 const { Controller } = require("egg");
 const dayjs = require("dayjs");
-const cert = require("./cert");
-const utils = require("./utils");
+const cert = require("../service/cert");
+const utils = require("../service/utils");
 var multer = require("multer");
 const { log } = require("console");
-const { isObjectEqual } = require("./record");
+const { isObjectEqual } = require("../service/record");
 const fs = require("fs");
 const path = require("path");
 const storage = multer.diskStorage({
@@ -20,6 +20,11 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
 });
+// 初始化环境
+const workspaceDir = path.resolve(__dirname, "../../workspace");
+if (!fs.existsSync(workspaceDir)) {
+  fs.mkdirSync(workspaceDir);
+}
 class DeployController extends Controller {
   queryFileStat(filePath) {
     return new Promise((rs, rj) => {

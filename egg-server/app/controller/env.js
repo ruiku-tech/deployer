@@ -1,5 +1,5 @@
 const { Controller } = require("egg");
-const install = require("./install");
+const install = require("../service/install");
 const path = require("path");
 const fs = require("fs");
 class envController extends Controller {
@@ -7,7 +7,7 @@ class envController extends Controller {
   async getList() {
     const { ctx } = this;
     const { request: req, response: res, body } = ctx;
-    const workspaceDir = path.resolve(__dirname, "workspace");
+    const workspaceDir = path.resolve(__dirname, "../../workspace");
     fs.readdir(workspaceDir, (err, files) => {
       body = { err, data: files.map((name) => ({ name })) };
     });

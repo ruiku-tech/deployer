@@ -108,4 +108,10 @@ module.exports = (app) => {
     deployMiddle,
     controller.deploy.postRecordDelete
   );
+  // 获取环境列表
+  router.get("/deploy/env/list", deployMiddle, controller.env.getList);
+  // 新建环境
+  router.post("/deploy/env/one", deployMiddle, controller.env.postOne);
+  // 删除配置
+  router.delete("/deploy/env/one", deployMiddle, controller.env.deleteOne);
 };

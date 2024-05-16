@@ -1,8 +1,8 @@
 const path = require("path");
 
 function createContext(env) {
-  const dir = path.resolve(__dirname, "workspace", env);
-  const userDir = path.resolve(__dirname, "workspace", "user");
+  const dir = path.resolve(__dirname, "../../workspace", env);
+  const userDir = path.resolve(__dirname, "../../workspace", "user");
   const varsFile = path.resolve(dir, "vars.ini");
   const fileDir = path.resolve(dir, "files");
   const hostsFile = path.resolve(dir, "hosts.ini");

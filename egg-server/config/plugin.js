@@ -7,5 +7,6 @@ module.exports = {
   multipart: {
     enable: true,
     package: "egg-multipart",
+    package: "egg-cors",
   },
 };
