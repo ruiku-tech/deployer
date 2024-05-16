@@ -30,7 +30,7 @@
 </template>
 
 <script>
-import { fetchEnvs, saveEnv, deleteEnv, aaa } from "../api";
+import { fetchEnvs, saveEnv, deleteEnv } from "../api";
 import dataCenter from "../dataCenter";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { confirmDelete } from "../utils";
