@@ -26,7 +26,7 @@ module.exports = (appInfo) => {
   config.cors = {
     origin: "*", // 允许所有来源请求，如果只允许特定来源，可以替换为具体的 URL，例如 'http://192.168.31.79:8080'
     allowMethods: "GET,HEAD,PUT,POST,DELETE,PATCH,OPTIONS",
-    allowHeaders: "env,Content-Type,Authorization", // 确保包含 'env'
+    allowHeaders: "*", // 确保包含 'env'
     credentials: true, // 如果需要支持跨域 cookie
   };
   // add your user config here
@@ -38,7 +38,9 @@ module.exports = (appInfo) => {
     mode: "file",
     fileSize: "50mb", // 设置最大文件大小
   };
-
+  config.websocket = {
+    path: "/ws",
+  };
   return {
     ...config,
     ...userConfig,

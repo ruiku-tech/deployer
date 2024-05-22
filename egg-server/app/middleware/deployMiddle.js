@@ -4,25 +4,17 @@ const config = require("../service/config");
 module.exports = (options) => {
   return async (ctx, next) => {
     const { request: req, response: res } = ctx;
-    if (
-      !req.path.startsWith("/env") &&
-      !req.path.startsWith("/deploy/deployings")
-    ) {
-      const env = req.headers.env;
-      if (!env) {
-        return (ctx.body = { err: "请选择环境" });
-      }
-      const dir = path.resolve(__dirname, "../../workspace", env);
-
-      const context = config.createContext(env);
-
-      if (!fs.existsSync(context.dir)) {
-        return (ctx.body = { err: "当前环境不存在" });
-      }
-      req.context = context;
+    const env = req.headers.env;
+    if (!env) {
+      return (ctx.body = { err: "请选择环境" });
     }
-    //解析
-    ctx.app.middlewares.bodyParser(ctx, next);
+    const dir = path.resolve(__dirname, "../../workspace", env);
+
+    const context = config.createContext(env);
+    if (!fs.existsSync(context.dir)) {
+      return (ctx.body = { err: "当前环境不存在" });
+    }
+    req.context = context;
     await next();
   };
 };

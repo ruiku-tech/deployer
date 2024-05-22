@@ -1,33 +1,29 @@
-const WebSocket = require("ws");
 const clients = [];
-function init(server) {
-  const wss = new WebSocket.Server({ server });
-  wss.on("connection", (ws) => {
-    if (!clients.includes(ws)) {
-      clients.push(ws);
-    }
-    ws.on("close", () => {
-      const index = clients.indexOf(ws);
-      if (index >= 0) {
-        clients.splice(index, 1);
+function init(socket) {
+  if (!clients.includes(socket)) {
+    clients.push(socket);
+  }
+  socket.on("message", (msg) => {
+    socket.send("");
+  });
+
+  socket.on("close", (reason) => {
+    console.log("Connection closed:", reason);
+  });
+  socket.send("Hello, client");
+}
+function cast(msg, env) {
+  if (global.isTest) {
+    console.log(msg);
+  } else {
+    clients.forEach((ws) => {
+      if (env) {
+        ws.send(`:user:${env}::${msg}`);
+      } else {
+        ws.send(msg);
       }
     });
-    ws.on("message", (e) => {
-      ws.send("");
-    });
-    ws.send("INFO:Hello, client!");
-  });
-}
-function cast(msg) {
-  setInterval(() => {
-    if (global.isTest) {
-      console.log(msg);
-    } else {
-      clients.forEach((ws) => {
-        ws.send(msg);
-      });
-    }
-  }, 1000);
+  }
 }
 
 module.exports = {

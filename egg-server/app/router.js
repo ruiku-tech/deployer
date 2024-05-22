@@ -5,6 +5,8 @@ module.exports = (app) => {
   const deployMiddle = app.middleware.deployMiddle();
   const { router, controller } = app;
   router.get("/", controller.home.index);
+
+  app.ws.route("/deploy", controller.ws.connect);
   // 获取变量
   router.get("/deploy/vars", deployMiddle, controller.deploy.getVars);
   // 获取配置
@@ -70,11 +72,7 @@ module.exports = (app) => {
   router.post("/deploy/run", deployMiddle, controller.deploy.postRun);
 
   // 获取正在部署的
-  router.get(
-    "/deploy/deployings",
-    deployMiddle,
-    controller.deploy.getDeployings
-  );
+  router.get("/deploy/deployings", controller.deploy.getDeployings);
 
   // 获取部署
   router.delete(
@@ -93,9 +91,9 @@ module.exports = (app) => {
   router.get("/deploy/api_auto", deployMiddle, controller.deploy.getApiAuto);
 
   // 注册
-  router.post("/deploy/register", deployMiddle, controller.deploy.postRegister);
+  router.post("/deploy/register", controller.deploy.postRegister);
   // 登陆
-  router.post("/deploy/login", deployMiddle, controller.deploy.postLogin);
+  router.post("/deploy/login", controller.deploy.postLogin);
   // 记录列表
   router.get(
     "/deploy/recordList",
@@ -109,9 +107,9 @@ module.exports = (app) => {
     controller.deploy.postRecordDelete
   );
   // 获取环境列表
-  router.get("/deploy/env/list", deployMiddle, controller.env.getList);
+  router.get("/deploy/env/list", controller.env.getList);
   // 新建环境
-  router.post("/deploy/env/one", deployMiddle, controller.env.postOne);
+  router.post("/deploy/env/one", controller.env.postOne);
   // 删除配置
-  router.delete("/deploy/env/one", deployMiddle, controller.env.deleteOne);
+  router.delete("/deploy/env/one", controller.env.deleteOne);
 };

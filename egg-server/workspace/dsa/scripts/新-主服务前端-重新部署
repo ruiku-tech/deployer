@@ -1,0 +1,6 @@
+put: [FILE:主服务前端],/root/main.zip
+run: docker stop gateway
+run: rm -rf /root/main/fury-client-test
+run: unzip /root/main.zip -d /root/main
+run: sed -i 's#//SHOW_USER_ID#[VAR: SHOW_USER_ID_EXP]#g' /root/main/fury-client-test/index.html
+run: docker start gateway

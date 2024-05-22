@@ -2,15 +2,21 @@ const { Controller } = require("egg");
 const install = require("../service/install");
 const path = require("path");
 const fs = require("fs");
+const util = require("util");
 class envController extends Controller {
   // 获取环境列表
   async getList() {
     const { ctx } = this;
-    const { request: req, response: res, body } = ctx;
     const workspaceDir = path.resolve(__dirname, "../../workspace");
-    fs.readdir(workspaceDir, (err, files) => {
-      body = { err, data: files.map((name) => ({ name })) };
-    });
+    try {
+      const readdir = util.promisify(fs.readdir);
+      const files = await readdir(workspaceDir);
+      ctx.body = {
+        data: files.filter((name) => name !== "user").map((name) => ({ name })),
+      };
+    } catch (err) {
+      ctx.body = { err };
+    }
   }
   // 新建环境
   async postOne() {
@@ -31,7 +37,7 @@ class envController extends Controller {
     } else {
       // 新建空环境
       install.create(name);
-      body = {};
+      ctx.body = {};
     }
   }
   // 删除配置
@@ -39,13 +45,13 @@ class envController extends Controller {
     const { ctx } = this;
     const { request: req, response: res, body } = ctx;
     const name = req.query.name;
-    install
+    await install
       .destory(name)
       .then(() => {
-        body = {};
+        ctx.body = {};
       })
       .catch((err) => {
-        body = { err };
+        ctx.body = { err };
       });
   }
 }

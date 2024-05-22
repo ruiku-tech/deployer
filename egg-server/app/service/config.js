@@ -25,7 +25,12 @@ function createContext(env) {
     deployDir,
   };
 }
+function userFile() {
+  const userDir = path.resolve(__dirname, "../../workspace", "user");
+  return path.resolve(userDir, "user.ini");
+}
 
 module.exports = {
   createContext,
+  userFile,
 };
