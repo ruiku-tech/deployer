@@ -1,5 +1,5 @@
 /* eslint valid-jsdoc: "off" */
-
+const path = require("path")
 /**
  * @param {Egg.EggAppInfo} appInfo app info
  */
@@ -33,6 +33,15 @@ module.exports = (appInfo) => {
   const userConfig = {
     // myAppName: 'egg',
   };
+  config.static = {
+    prefix: '/', // 访问静态资源的路径前缀
+    dir: path.join(appInfo.baseDir, 'app/public/dist'), // 静态文件存放的目录
+    dynamic: true, // 是否支持动态加载
+    preload: false, // 是否预加载静态资源
+    maxAge: 31536000, // 浏览器缓存时间，单位为毫秒，默认为一年
+    buffer: true, // 是否启用文件缓存
+  };
+  
 
   config.multipart = {
     mode: "file",

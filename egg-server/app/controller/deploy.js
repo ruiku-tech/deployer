@@ -23,6 +23,11 @@ const upload = multer({
   storage: storage,
 });
 const util = require("util");
+
+const readFile = util.promisify(fs.readFile);
+const readdir = util.promisify(fs.readdir);
+const writeFile = util.promisify(fs.writeFile);
+const unlink = util.promisify(fs.unlink);
 // 初始化环境
 const workspaceDir = path.resolve(__dirname, "../../workspace");
 if (!fs.existsSync(workspaceDir)) {
@@ -42,7 +47,6 @@ class DeployController extends Controller {
   // 获取变量
   async getVars(ctx) {
     const { request: req, response: res } = ctx;
-    const readFile = util.promisify(fs.readFile);
     try {
       const data = await readFile(req.context.varsFile, "utf-8");
       ctx.body = { data: data };
@@ -54,7 +58,7 @@ class DeployController extends Controller {
   // 更新配置
   async updateVars(ctx) {
     const { request: req, response: res } = ctx;
-    const writeFile = util.promisify(fs.writeFile);
+    
     try {
       const data = await writeFile(
         req.context.varsFile,
@@ -69,7 +73,7 @@ class DeployController extends Controller {
   // 获取文件列表
   async getFiles(ctx) {
     const { request: req, response: res } = ctx;
-    const readdir = util.promisify(fs.readdir);
+    
     try {
       const files = await readdir(req.context.fileDir);
       ctx.body = { data: files.map((file) => ({ file })) };
@@ -82,7 +86,7 @@ class DeployController extends Controller {
   async getFilesStat(ctx) {
     const { request: req, response: res } = ctx;
     try {
-      const readdir = util.promisify(fs.readdir);
+      
       const files = await readdir(req.context.fileDir);
       const stats = await Promise.all(
         files.map((file) =>
@@ -117,7 +121,7 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     const name = req.query.name;
     const filePath = path.resolve(req.context.fileDir, name);
-    const unlink = util.promisify(fs.unlink);
+    
     try {
       const data = await unlink(filePath);
       ctx.body = { data: data };
@@ -129,7 +133,6 @@ class DeployController extends Controller {
   // 获取服务器列表
   async getHosts(ctx) {
     const { request: req, response: res } = ctx;
-    const readFile = util.promisify(fs.readFile);
     try {
       const data = await readFile(req.context.hostsFile, "utf-8");
       let jsonData = "";
@@ -145,7 +148,7 @@ class DeployController extends Controller {
   // 获取服务器列表
   async postHosts(ctx) {
     const { request: req, response: res } = ctx;
-    const writeFile = util.promisify(fs.writeFile);
+    
     try {
       const data = await writeFile(
         req.context.hostsFile,
@@ -162,7 +165,7 @@ class DeployController extends Controller {
   async getConfigs(ctx) {
     const { request: req, response: res } = ctx;
     const context = req.context;
-    const readdir = util.promisify(fs.readdir);
+    
     try {
       const files = await readdir(context.configDir);
       ctx.body = { data: files.map((name) => ({ name })) };
@@ -176,7 +179,7 @@ class DeployController extends Controller {
     const name = req.query.name;
     const context = req.context;
     const filePath = path.resolve(context.configDir, name);
-    const readFile = util.promisify(fs.readFile);
+    
     try {
       const data = await readFile(filePath, "utf-8");
       ctx.body = { data: data };
@@ -190,7 +193,7 @@ class DeployController extends Controller {
     const name = req.body.name;
     const context = req.context;
     const filePath = path.resolve(context.configDir, name);
-    const writeFile = util.promisify(fs.writeFile);
+    
     try {
       await writeFile(filePath, req.body.data, "utf-8");
       ctx.body = { success: true };
@@ -204,7 +207,7 @@ class DeployController extends Controller {
     const name = req.query.name;
     const context = req.context;
     const filePath = path.resolve(context.configDir, name);
-    const unlink = util.promisify(fs.unlink);
+    
     try {
       await unlink(filePath);
       ctx.body = { success: true };
@@ -217,7 +220,7 @@ class DeployController extends Controller {
   async getScripts(ctx) {
     const { request: req, response: res } = ctx;
     const context = req.context;
-    const readdir = util.promisify(fs.readdir);
+    
     try {
       const files = await readdir(context.scriptDir);
       ctx.body = { data: files.map((name) => ({ name })) };
@@ -231,7 +234,7 @@ class DeployController extends Controller {
     const name = req.query.name;
     const context = req.context;
     const filePath = path.resolve(context.scriptDir, name);
-    const readFile = util.promisify(fs.readFile);
+    
     try {
       const data = await readFile(filePath, "utf-8");
       ctx.body = { data: data };
@@ -245,7 +248,7 @@ class DeployController extends Controller {
     const name = req.body.name;
     const context = req.context;
     const filePath = path.resolve(context.scriptDir, name);
-    const writeFile = util.promisify(fs.writeFile);
+    
     try {
       await writeFile(filePath, req.body.data, "utf-8");
       ctx.body = { success: true };
@@ -259,7 +262,7 @@ class DeployController extends Controller {
     const name = req.query.name;
     const context = req.context;
     const filePath = path.resolve(context.scriptDir, name);
-    const unlink = util.promisify(fs.unlink);
+    
     try {
       await unlink(filePath);
       ctx.body = { success: true };
@@ -271,7 +274,7 @@ class DeployController extends Controller {
   // 获取编排列表
   async getBats(ctx) {
     const { request: req, response: res } = ctx;
-    const readdir = util.promisify(fs.readdir);
+    
     try {
       const files = await readdir(req.context.batDir);
       ctx.body = { data: files.map((name) => ({ name })) };
@@ -284,7 +287,7 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     const name = req.query.name;
     const filePath = path.resolve(req.context.batDir, name);
-    const readFile = util.promisify(fs.readFile);
+    
     try {
       const data = await readFile(filePath, "utf-8");
       ctx.body = {
@@ -304,7 +307,7 @@ class DeployController extends Controller {
     if (exist) {
       return (ctx.body = { err: "编排已存在" });
     }
-    const writeFile = util.promisify(fs.writeFile);
+    
     try {
       const data = await writeFile(filePath, "{}", "utf-8");
       ctx.body = { data: data };
@@ -318,7 +321,7 @@ class DeployController extends Controller {
     const context = req.context;
     const name = req.query.name;
     const filePath = path.resolve(context.batDir, name);
-    const unlink = util.promisify(fs.unlink);
+    
     try {
       await unlink(filePath);
       ctx.body = { success: true };
@@ -332,13 +335,13 @@ class DeployController extends Controller {
     const name = req.body.name;
     const context = req.context;
     const filePath = path.resolve(context.batDir, name);
-    const readFile = util.promisify(fs.readFile);
+    
     try {
       const data = await readFile(filePath, "utf-8");
       const json = JSON.parse(data);
       const { name, ...rest } = req.body.data;
       json[name] = rest;
-      const writeFile = util.promisify(fs.writeFile);
+      
       writeFile(filePath, JSON.stringify(json), "utf-8");
       ctx.body = { success: true };
     } catch (err) {
@@ -351,12 +354,12 @@ class DeployController extends Controller {
     const name = req.query.name;
     const context = req.context;
     const filePath = path.resolve(context.batDir, name);
-    const readFile = util.promisify(fs.readFile);
+    
     try {
       const data = await readFile(filePath, "utf-8");
       const json = JSON.parse(data);
       delete json[req.query.item];
-      const writeFile = util.promisify(fs.writeFile);
+      
       writeFile(filePath, JSON.stringify(json), "utf-8");
       ctx.body = { success: true };
     } catch (err) {
@@ -366,7 +369,7 @@ class DeployController extends Controller {
   // 获取脚本列表
   async getDeploys(ctx) {
     const { request: req, response: res } = ctx;
-    const readdir = util.promisify(fs.readdir);
+    
     try {
       const files = await readdir(req.context.deployDir);
       ctx.body = { data: files };
@@ -410,7 +413,7 @@ class DeployController extends Controller {
     // );
     let record = [];
     try {
-      const readFile = util.promisify(fs.readFile);
+      
       const data = await readFile(
         path.resolve(req.context.deployDir, `record.txt`),
         "utf-8"
@@ -419,7 +422,7 @@ class DeployController extends Controller {
       console.log(record);
     } catch (err) {}
     record.push(...recordList);
-    const writeFile = util.promisify(fs.writeFile);
+    
     try {
       const data = await writeFile(
         path.resolve(req.context.deployDir, `record.txt`),
@@ -501,7 +504,6 @@ class DeployController extends Controller {
   async postRegister(ctx) {
     const { request: req, response: res } = ctx;
     // 读取文件
-    const readFile = util.promisify(fs.readFile);
     let jsonData;
     try {
       const data = await readFile(userFile, "utf-8");
@@ -530,12 +532,8 @@ class DeployController extends Controller {
       username: req.body.username,
       password: req.body.password,
     });
-    const writeFile = util.promisify(fs.writeFile);
-    const mkdir = util.promisify(fs.mkdir);
+    
     try {
-      await mkdir(userFile.split("/user.ini").join(""), {
-        recursive: true,
-      });
       const data = await writeFile(
         userFile,
         JSON.stringify(jsonData, { recursive: true }, 2),
@@ -549,12 +547,8 @@ class DeployController extends Controller {
   // 登陆
   async postLogin(ctx) {
     const { request: req, response: res } = ctx;
-    const readFile = util.promisify(fs.readFile);
-    const mkdir = util.promisify(fs.mkdir);
+    
     try {
-      await mkdir(userFile.split("/user.ini").join(""), {
-        recursive: true,
-      });
       let jsonData;
       const data = await readFile(userFile, "utf-8");
       if (data) {
@@ -585,7 +579,7 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     const userName = req.query.username;
     let recordList = [];
-    const readFile = util.promisify(fs.readFile);
+    
     try {
       const data = await readFile(
         path.resolve(req.context.deployDir, `record.txt`),
@@ -607,7 +601,7 @@ class DeployController extends Controller {
   //删除记录数据
   async postRecordDelete(ctx) {
     const { request: req, response: res } = ctx;
-    const readFile = util.promisify(fs.readFile);
+    
     try {
       const data = await readFile(
         path.resolve(req.context.deployDir, `record.txt`),
@@ -616,7 +610,7 @@ class DeployController extends Controller {
       ctx.body = { data: data };
       let json = JSON.parse(data);
       json = json.filter((item) => !isObjectEqual(item, req.body.item));
-      const writeFile = util.promisify(fs.writeFile);
+      
       await writeFile(
         path.resolve(req.context.deployDir, `record.txt`),
         JSON.stringify(json),

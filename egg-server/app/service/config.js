@@ -26,8 +26,7 @@ function createContext(env) {
   };
 }
 function userFile() {
-  const userDir = path.resolve(__dirname, "../../workspace", "user");
-  return path.resolve(userDir, "user.ini");
+  return path.resolve(__dirname, "../../data", "user.ini");
 }
 
 module.exports = {
