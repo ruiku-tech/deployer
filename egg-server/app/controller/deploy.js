@@ -442,7 +442,7 @@ class DeployController extends Controller {
     if (!server) {
       return (ctx.body = { err: `找不到服务器:${req.body.server}` });
     }
-    await ctx.service.executer1
+    await ctx.service.executer
       .run(server, req.body.cmd)
       .then(() => {
         ctx.body = { data: "success" };
