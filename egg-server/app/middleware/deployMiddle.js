@@ -8,7 +8,6 @@ module.exports = (options) => {
     if (!env) {
       return (ctx.body = { err: "请选择环境" });
     }
-    const dir = path.resolve(__dirname, "../../workspace", env);
 
     const context = config.createContext(env);
     if (!fs.existsSync(context.dir)) {
