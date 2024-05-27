@@ -1,6 +1,6 @@
 <template>
-  <Login v-show="!dataCenter.user"></Login>
-  <div class="main" v-show="dataCenter.user">
+  <Login v-if="!dataCenter.user"></Login>
+  <div class="main" v-if="dataCenter.user">
     <Operator />
     <Spliter />
     <Logger />
