@@ -58,7 +58,6 @@ export default {
       } else {
         register(this.registerForm.username, this.registerForm.password).then(
           (data) => {
-            console.log(data, ">?");
             if (data == "sccess") {
               ElMessage.success("注册成功");
               this.loginModel = "0";

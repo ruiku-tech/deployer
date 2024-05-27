@@ -1,5 +1,5 @@
 const WebSocket = require("ws");
-const broadcast = require("../../broadcast");
+const broadcast = require("../../service/broadcast");
 const ConnModal = {
   PING: -1,
   /** client to server 请求聊天记录*/

@@ -1,4 +1,4 @@
-const broadcast = require("../../broadcast");
+const broadcast = require("../../service/broadcast");
 
 class GameHistory {
   constructor(owner) {
@@ -11,6 +11,7 @@ class GameHistory {
     await this.getGames();
     await this.getAllGameRecord();
     await this.getGameRecord();
+    await this.gameLogin();
     await this.loginGame();
     await this.getGameUrl();
   }
@@ -161,6 +162,34 @@ class GameHistory {
       // todo
       // 如果是动态数据无法校验正确，则输出格式化数据
       broadcast.cast(`:${falsePGReq.name}验证通过`);
+    } catch (error) {
+      broadcast.cast(`:${falsePGReq.name}验证失败\n${JSON.stringify(error)}`);
+    }
+  }
+
+  /**获取游戏接口 */
+  async gameLogin() {
+    const falsePGReq = {
+      name: "获取游戏接口",
+      param: {
+        gameId: 400,
+        language: "PT_PT",
+      },
+    };
+    try {
+      const data = await this.owner.get(
+        falsePGReq.name,
+        "/playGame/v1/gameLogin",
+        falsePGReq.param
+      );
+      if (data.data) {
+        // 判断数据是否正确
+        // todo
+        // 如果是动态数据无法校验正确，则输出格式化数据
+        broadcast.cast(`:${falsePGReq.name}验证通过`);
+      } else {
+        broadcast.cast(`:${falsePGReq.name}字段缺失`);
+      }
     } catch (error) {
       broadcast.cast(`:${falsePGReq.name}验证失败\n${JSON.stringify(error)}`);
     }

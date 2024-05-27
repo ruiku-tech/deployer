@@ -1,4 +1,4 @@
-const broadcast = require("../../broadcast");
+const broadcast = require("../../service/broadcast");
 
 class Referee {
   constructor(owner) {

@@ -18,7 +18,7 @@ function cast(msg, env) {
   } else {
     clients.forEach((ws) => {
       if (env) {
-        ws.send(`:user:${env}::${msg}`);
+        ws.send(`环境:${env}:${msg}`);
       } else {
         ws.send(msg);
       }

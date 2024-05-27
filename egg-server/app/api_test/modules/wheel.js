@@ -1,4 +1,4 @@
-const broadcast = require("../../broadcast");
+const broadcast = require("../../service/broadcast");
 //生成手机号
 function generateRandomNumber() {
   // 生成8位随机数

@@ -132,7 +132,12 @@ class DeployController extends Controller {
     const readFile = util.promisify(fs.readFile);
     try {
       const data = await readFile(req.context.hostsFile, "utf-8");
-      ctx.body = { data: JSON.parse(data) };
+      let jsonData = "";
+      try {
+        jsonData = JSON.parse(data);
+      } catch (error) {}
+
+      ctx.body = { data: jsonData };
     } catch (err) {
       ctx.body = { err };
     }
@@ -386,7 +391,7 @@ class DeployController extends Controller {
       { vars, hosts, files: req.body.files },
       req.context
     );
-    list = ctx.service.executer.parse(context, list);
+    list = ctx.service.executer.parse(env, context, list);
     const parseErrs = list.filter((item) => item.err);
     if (parseErrs.length) {
       return (ctx.body = {
@@ -421,7 +426,7 @@ class DeployController extends Controller {
         JSON.stringify(record, null, 2),
         "utf-8"
       );
-      ctx.service.executer.deployList(env, list);
+      ctx.service.executer.deployList(list);
       ctx.body = { data: data };
     } catch (err) {
       ctx.body = { err };
@@ -434,8 +439,8 @@ class DeployController extends Controller {
     if (!server) {
       return (ctx.body = { err: `找不到服务器:${req.body.server}` });
     }
-    ctx.service
-      .executer(server, req.body.cmd)
+    await ctx.service.executer1
+      .run(server, req.body.cmd)
       .then(() => {
         ctx.body = { data: "success" };
       })

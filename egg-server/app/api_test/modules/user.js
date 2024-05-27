@@ -30,7 +30,7 @@ const registerReq = {
 };
 
 const e = require("express");
-const broadcast = require("../../broadcast");
+const broadcast = require("../../service/broadcast");
 
 class User {
   constructor(owner) {
@@ -54,7 +54,7 @@ class User {
       name: "邮箱登陆",
       json: {
         email: "666666@qq.com",
-        password: "Aa123456",
+        password: "Ss141242",
         client: "ios",
       },
     };
@@ -84,6 +84,7 @@ class User {
       this.owner.updateData("freshToken", data.data.freshToken);
       this.owner.updateData("userId", data.data.id);
     } catch (error) {
+      console.log(error);
       return Promise.reject(error);
     }
   }

@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const dayjs = require("dayjs");
 const bodyParser = require("body-parser");
-// const executer = require("./executer");
+const executer = require("./executer");
 const envRouter = require("./env.router");
 const cert = require("./cert");
 const utils = require("./utils");
@@ -303,8 +303,8 @@ router.post("/deploy", (req, res) => {
     "utf-8",
     () => {}
   );
+  executer.deployList.call(context, list);
   res.send({ data: "success" });
-  executer.deployList.call(context, env, list);
 });
 router.post("/run", (req, res) => {
   const hosts = utils.parseHosts.call(req.context);

@@ -117,6 +117,8 @@ export default {
         ret[item.name] = `${item.host}:${item.password}`;
         return ret;
       }, {});
+      console.log(data);
+
       return saveHosts(data).then(this.fresh);
     },
   },

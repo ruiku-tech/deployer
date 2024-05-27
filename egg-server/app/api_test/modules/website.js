@@ -1,6 +1,6 @@
 // 站点配置模块
 
-const broadcast = require("../../broadcast");
+const broadcast = require("../../service/broadcast");
 
 class Website {
   constructor(owner) {

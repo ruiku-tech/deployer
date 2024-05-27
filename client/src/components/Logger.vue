@@ -36,7 +36,7 @@ export default {
     return {
       deployings: [],
       dataCenter,
-      envList: [dataCenter.env.value],
+      envList: [{ name: dataCenter.env.value }],
     };
   },
   mounted() {
@@ -98,16 +98,18 @@ export default {
     addLog(info) {
       const log = info.split(":");
       var line = document.createElement("pre");
-      line.className = `item ${log[0]}`;
-      if (log[0] === "NORM") {
-        line.textContent = `${log.slice(1).join(":")} @${dayjs().format(
-          "MM-DD hh:mm:ss"
-        )}`;
-      } else {
-        line.textContent = log.slice(1).join(":");
+      line.className = `item ${log[0] == "环境" ? log[2] : log[0]}`;
+      if (this.envList.find((obj) => obj.name === log[1]) || log[0] != "环境") {
+        if (log[2] === "NORM") {
+          line.textContent = `${log.slice(1).join(":")} @${dayjs().format(
+            "MM-DD hh:mm:ss"
+          )}`;
+        } else {
+          line.textContent = log.slice(1).join(":");
+        }
+        this.logger.appendChild(line);
+        this.logger.scrollTo(0, this.logger.scrollHeight);
       }
-      this.logger.appendChild(line);
-      this.logger.scrollTo(0, this.logger.scrollHeight);
     },
   },
 };

@@ -37,6 +37,7 @@ class ExecuterService extends Service {
     }, 1000);
   }
   getFile(conn, srcFile, distFile) {
+    const env = this.env;
     return new Promise((resolve, reject) => {
       conn.sftp(function (err, sftp) {
         if (err) return reject(err);
@@ -54,17 +55,17 @@ class ExecuterService extends Service {
                     (transferred * 100) /
                     total
                   ).toFixed(2)}%`,
-                  this.env
+                  env
                 );
               }
             },
           },
           function (err) {
             if (err) {
-              broadcast.cast(`ERR:[${conn.host}] ${err.message}`, this.env);
+              broadcast.cast(`ERR:[${conn.host}] ${err.message}`, env);
               return reject(err);
             }
-            broadcast.cast(`INFO:[${conn.host}] 文件下载成功`, this.env);
+            broadcast.cast(`INFO:[${conn.host}] 文件下载成功`, env);
             resolve();
           }
         );
@@ -72,41 +73,48 @@ class ExecuterService extends Service {
     });
   }
   putFile(conn, srcFile, distFile) {
+    const env = this.env;
     return new Promise((resolve, reject) => {
       conn.sftp(function (err, sftp) {
         if (err) return reject(err);
         let now = Date.now();
         // 上传文件
-        sftp.fastPut(
-          srcFile,
-          distFile,
-          {
-            step: function (transferred, chunk, total) {
-              if (Date.now() - now > 1000 || transferred >= total) {
-                now = Date.now();
-                broadcast.cast(
-                  `INFO:[${conn.host}] 进度:${(
-                    (transferred * 100) /
-                    total
-                  ).toFixed(2)}%`,
-                  this.env
-                );
-              }
+        try {
+          sftp.fastPut(
+            srcFile,
+            distFile,
+            {
+              step: function (transferred, chunk, total) {
+                if (Date.now() - now > 1000 || transferred >= total) {
+                  now = Date.now();
+                  console.log(conn.host, "12", "不对行");
+                  broadcast.cast(
+                    `INFO:[${conn.host}] 进度:${(
+                      (transferred * 100) /
+                      total
+                    ).toFixed(2)}%`,
+                    env
+                  );
+                }
+              },
             },
-          },
-          function (err) {
-            if (err) {
-              broadcast.cast(`ERR:[${conn.host}] ${err.message}`, this.env);
-              return reject(err);
+            function (err) {
+              if (err) {
+                broadcast.cast(`ERR:[${conn.host}] ${err.message}`, env);
+                return reject(err);
+              }
+              broadcast.cast(`INFO:[${conn.host}] 文件上传成功`, env);
+              resolve();
             }
-            broadcast.cast(`INFO:[${conn.host}] 文件上传成功`, this.env);
-            resolve();
-          }
-        );
+          );
+        } catch (error) {
+          console.log(error);
+        }
       });
     });
   }
   execute(conn, cmd) {
+    const env = this.env;
     return new Promise((resolve, reject) => {
       let buffer = "";
       conn.exec(cmd, function (err, stream) {
@@ -114,16 +122,16 @@ class ExecuterService extends Service {
         stream
           .on("close", function (code, signal) {
             if (buffer) {
-              broadcast.cast(`INFO:[${conn.host}] ${buffer}`, this.env);
+              broadcast.cast(`INFO:[${conn.host}] ${buffer}`, env);
             }
             if (signal) {
               broadcast.cast(
                 `ERR:[${conn.host}] ${cmd} 执行失败 code:${signal}`,
-                this.env
+                env
               );
               reject(new Error(`${cmd} 执行失败 code:${signal}`));
             } else {
-              broadcast.cast(`NORM:[${conn.host}] ${cmd} 完成`, this.env);
+              broadcast.cast(`NORM:[${conn.host}] ${cmd} 完成`, env);
               resolve();
             }
           })
@@ -133,19 +141,18 @@ class ExecuterService extends Service {
               const arr = buffer.split("\n");
               arr
                 .slice(0, -1)
-                .map((l) =>
-                  broadcast.cast(`INFO:[${conn.host}] ${l}`, this.env)
-                );
+                .map((l) => broadcast.cast(`INFO:[${conn.host}] ${l}`, env));
               buffer = arr[arr.length - 1];
             }
           })
           .stderr.on("data", function (data) {
-            broadcast.cast(`ERR:[${conn.host}] ${data}`, this.env);
+            broadcast.cast(`ERR:[${conn.host}] ${data}`, env);
           });
       });
     });
   }
   query(conn, cmd) {
+    const env = this.env;
     return new Promise((resolve, reject) => {
       const result = [];
       conn.exec(cmd, function (err, stream) {
@@ -158,7 +165,7 @@ class ExecuterService extends Service {
             result.push(data);
           })
           .stderr.on("data", function (data) {
-            rbroadcast.cast(`ERR:[${conn.host}] ${data}`, this.env);
+            rbroadcast.cast(`ERR:[${conn.host}] ${data}`, env);
           });
       });
     });
@@ -261,7 +268,8 @@ class ExecuterService extends Service {
   }
 
   // [{name:string,host:string,cmds:string[]}]
-  parse(content, list) {
+  parse(env, content, list) {
+    this.env = env;
     this.content = content;
     // 总的变量配置
     const vars = this.content.vars;
@@ -346,6 +354,7 @@ class ExecuterService extends Service {
     const errors = [];
     const host = item.server.host;
     const password = item.server.password;
+    console.log("是的");
     const connect = this.genConn(host, password);
     const conn = connect.conn;
     console.log("????");
@@ -414,8 +423,8 @@ class ExecuterService extends Service {
     }
   }
 
-  async deployList(env, list) {
-    this.env = env;
+  async deployList(list) {
+    console.log(list, "真美");
     for (let i = 0; i < list.length; ++i) {
       const item = list[i];
       await this.deply(item);

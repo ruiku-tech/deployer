@@ -50,7 +50,16 @@ service.interceptors.response.use(
     const data = response.data;
 
     if (data.err) {
-      ElMessage.error(`异常错误:${data.err.code}`);
+      if (data.err.code) {
+        ElMessage.error(`异常错误:${data.err.code}`);
+      } else {
+        const jsonErr = JSON.stringify(data.err);
+        if (jsonErr) {
+          ElMessage.error(`异常错误:${jsonErr}`);
+        } else {
+          ElMessage.error(`异常错误:${data.err}`);
+        }
+      }
       return Promise.reject();
     }
     return data.data;

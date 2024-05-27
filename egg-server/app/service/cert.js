@@ -14,7 +14,6 @@ function checkDir(dirPath) {
 }
 // 在验证过程中自动创建验证文件并放置
 async function createHttpChallenge(server, authz, challenge, keyAuthorization) {
-  console.log(challenge, "不舍得");
   const token = challenge.token;
   broadcast.cast(`INFO:开始创建验证文件`);
   const fileDir = this.fileDir;

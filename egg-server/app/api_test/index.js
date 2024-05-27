@@ -2,7 +2,7 @@ const axios = require("axios");
 const qs = require("querystring");
 const crypto = require("crypto");
 const broadcast = require("../service/broadcast");
-
+console.log("怎么回事");
 function generateSign() {
   const serverTime = Date.now();
   const hash = crypto.createHash("sha256");
@@ -23,7 +23,6 @@ const RedEnvelopeRain = require("./modules/redEnvelopeRain");
 const Cashback = require("./modules/cashback");
 const ReentryReward = require("./modules/reentryReward");
 const Referee = require("./modules/referee");
-
 class ApiTester {
   headers = {};
   data = {};

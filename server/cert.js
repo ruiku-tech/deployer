@@ -36,7 +36,7 @@ async function createHttpChallenge(server, authz, challenge, keyAuthorization) {
 async function requestCertificate(server, domain) {
   const fileDir = this.fileDir;
 
-  const privateKey = await acme.crypto.createPrivateKey()
+  const privateKey = await acme.crypto.createPrivateKey();
 
   // 创建 ACME 客户端
   const client = new acme.Client({
@@ -65,8 +65,8 @@ async function requestCertificate(server, domain) {
   });
 
   // 保存证书和密钥
-  fs.writeFileSync(certPath, cert, 'utf-8');
-  fs.writeFileSync(keyPath, key, 'utf-8');
+  fs.writeFileSync(certPath, cert, "utf-8");
+  fs.writeFileSync(keyPath, key, "utf-8");
 
   broadcast.cast(`INFO:${domain}证书生成完毕，开始部署`);
 

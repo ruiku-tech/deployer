@@ -1,4 +1,4 @@
-const broadcast = require("../../broadcast");
+const broadcast = require("../../service/broadcast");
 
 class Wallet {
   constructor(owner) {
@@ -12,6 +12,10 @@ class Wallet {
     await this.createOrder();
     await this.queryPayoutAmount();
     await this.createPayout();
+    await this.createRecharge();
+    await this.payPayout();
+    await this.createRecharge(1, "hkp");
+    await this.createRecharge(2, "kaka");
   }
   /** 获取获取用户各个币种的余额 */
   async getUserBalance() {
@@ -114,6 +118,56 @@ class Wallet {
       }
     } catch (error) {
       broadcast.cast(`:创建提现验证失败\n${JSON.stringify(error)}`);
+    }
+  }
+
+  /**创建新充值 */
+  async rechargeAutoTest() {
+    try {
+      const data = await this.owner.post("创建新充值", "/pay/v1/recharge", {
+        amount: 20,
+        payType: "PIX_QRCODE",
+      });
+      if (!data.data) {
+        broadcast.cast(`ERR:充值链接缺失`);
+      } else {
+        broadcast.cast(`:创建充值验证通过`);
+      }
+    } catch (error) {
+      broadcast.cast(`:创建新充值验证失败\n${JSON.stringify(error)}`);
+    }
+  }
+  /**充值测试 */
+  async createRecharge(type, name) {
+    try {
+      const data = await this.owner.post(
+        `充值测试${name}`,
+        `/pay/v1/rechargeAutoTest?type=${type}`
+      );
+      if (!data.data) {
+        broadcast.cast(`ERR:充值测试${name}链接缺失`);
+      } else {
+        broadcast.cast(`:充值测试${name}验证通过`);
+      }
+    } catch (error) {
+      broadcast.cast(`:充值测试${name}验证失败\n${JSON.stringify(error)}`);
+    }
+  }
+  /**创建新提现 */
+  async payPayout() {
+    try {
+      const data = await this.owner.post("创建新提现", "/pay/v1/payout", {
+        amount: 10,
+        type: "PIX_EMAIL",
+        accountNo: "1451053372@qq.com",
+      });
+      if (!data.data) {
+        broadcast.cast(`ERR:数据缺失\n${JSON.stringify(data)}`);
+      } else {
+        broadcast.cast(`:创建新提现验证通过`);
+      }
+    } catch (error) {
+      broadcast.cast(`:创建新提现验证失败\n${JSON.stringify(error)}`);
     }
   }
 }
