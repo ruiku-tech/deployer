@@ -143,3 +143,5 @@ server/dist.zip
 server/workspace
 
 egg-server/workspace/**
+release
+release.zip
