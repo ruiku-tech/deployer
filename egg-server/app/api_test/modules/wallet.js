@@ -16,6 +16,7 @@ class Wallet {
     await this.payPayout();
     await this.createRecharge(1, "hkp");
     await this.createRecharge(2, "kaka");
+    await this.payoutAutoTest();
   }
   /** 获取获取用户各个币种的余额 */
   async getUserBalance() {
@@ -140,9 +141,14 @@ class Wallet {
   /**充值测试 */
   async createRecharge(type, name) {
     try {
+      // this.owner.updateHeader("Content-Type", "application/json");
       const data = await this.owner.post(
         `充值测试${name}`,
-        `/pay/v1/rechargeAutoTest?type=${type}`
+        `/pay/v1/rechargeAutoTest?type=${type}`,
+        {
+          amount: 100,
+          payType: "PIX_QRCODE",
+        }
       );
       if (!data.data) {
         broadcast.cast(`ERR:充值测试${name}链接缺失`);
@@ -151,6 +157,27 @@ class Wallet {
       }
     } catch (error) {
       broadcast.cast(`:充值测试${name}验证失败\n${JSON.stringify(error)}`);
+    }
+  }
+  /**提现自动化测试 */
+  async payoutAutoTest() {
+    try {
+      const data = await this.owner.post(
+        `提现自动化测试`,
+        `/pay/v1/payoutAutoTest?type=1`,
+        {
+          amount: 1,
+          type: "PIX_EMAIL",
+          accountNo: "1451053372@qq.com",
+        }
+      );
+      if (!data.data) {
+        broadcast.cast(`ERR:提现自动化测试链接缺失`);
+      } else {
+        broadcast.cast(`:提现自动化测试验证通过`);
+      }
+    } catch (error) {
+      broadcast.cast(`:提现自动化测试验证失败\n${JSON.stringify(error)}`);
     }
   }
   /**创建新提现 */

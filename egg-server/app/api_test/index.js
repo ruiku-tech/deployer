@@ -34,16 +34,16 @@ class ApiTester {
     this.config = config;
     new Website(this);
     new Wheel(this);
-    new User(this);
-    new WS(this);
-    new GameHistory(this);
+    // new User(this);
+    // new WS(this);
+    // new GameHistory(this);
     new Wallet(this);
-    new GirdNine(this);
-    new Originais(this);
-    new RedEnvelopeRain(this);
-    new Cashback(this);
-    new ReentryReward(this);
-    new Referee(this);
+    // new GirdNine(this);
+    // new Originais(this);
+    // new RedEnvelopeRain(this);
+    // new Cashback(this);
+    // new ReentryReward(this);
+    // new Referee(this);
   }
 
   /**注册 */

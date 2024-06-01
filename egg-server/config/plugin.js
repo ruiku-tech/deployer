@@ -16,4 +16,8 @@ module.exports = {
     enable: true,
     package: "egg-websocket-plugin",
   },
+  mongoose: {
+    enable: true,
+    package: "egg-mongoose",
+  },
 };
