@@ -8,6 +8,8 @@ const { isObjectEqual } = require("../service/record");
 const fs = require("fs");
 const path = require("path");
 const config = require("../service/config");
+const pump = require('mz-modules/pump');
+
 const userFile = config.userFile();
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -102,16 +104,20 @@ class DeployController extends Controller {
 
   // 文件上传
   async uploadFile(ctx) {
+    const stream = await ctx.getFileStream();
     const { request: req, response: res } = ctx;
-    const file = ctx.request.files[0];
+    const time = dayjs().format("YYYYMMDD-HH:mm:ss");
     // 生成目标文件路径
-    const targetPath = `${req.context.fileDir}/${Date.now()}~${path.basename(
-      file.filename
-    )}`;
-    // 确保目录存在
-    await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
-    // 移动文件到目标路径
-    await fs.promises.rename(file.filepath, targetPath);
+    const targetPath = path.resolve(
+      req.context.fileDir,
+      `${time}~${path.basename(stream.filename)}`
+    );
+    // 确保目标目录存在
+    await fs.promises.mkdir(req.context.fileDir, { recursive: true });
+    // 创建写流
+    const writeStream = fs.createWriteStream(targetPath);
+    // 使用 pump 将文件流传输到写流
+    await pump(stream, writeStream);
     ctx.body = { data: "success" };
   }
 

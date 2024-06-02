@@ -43,15 +43,16 @@ module.exports = (appInfo) => {
   };
 
   config.multipart = {
-    mode: "file",
-    fileSize: "50mb", // 设置最大文件大小
+    mode: "stream",
+    fileSize: "500mb", // 设置最大文件大小
+    whitelist: () => true,
   };
   config.websocket = {
     path: "/ws",
   };
   config.mongoose = {
     client: {
-      url: "mongodb://localhost:27017/server_database",
+      url: "mongodb://43.132.219.112:33017/server_database",
       options: {
         useNewUrlParser: true,
         useUnifiedTopology: true,

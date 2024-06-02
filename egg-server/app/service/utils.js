@@ -1,10 +1,12 @@
 const fs = require("fs");
 
+const varSpliter = '>>'
+
 function parseVars() {
   const varStr = fs.readFileSync(this.varsFile, "utf-8");
   const lines = varStr.split("\n");
   return lines.reduce((ret, item) => {
-    const arr = item.split(":");
+    const arr = item.split(varSpliter);
     if (arr[0]) {
       ret[arr[0]] = arr[1].trim();
     }
@@ -13,7 +15,7 @@ function parseVars() {
 }
 function saveVars(varObj) {
   const varStr = Object.entries(varObj)
-    .map(([k, v]) => `${k}:${v}`)
+    .map(([k, v]) => `${k}${varSpliter}${v}`)
     .join("\n");
   fs.writeFileSync(this.varsFile, varStr, "utf-8");
 }
