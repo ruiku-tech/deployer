@@ -178,6 +178,7 @@ class ExecuterService extends Service {
     const fileDir = this.content.fileDir;
     const configDir = this.content.configDir;
     const tempDir = this.content.tempDir;
+    const server = this.server;
     // 替换文件路径、服务器名字、配置（并更换配置里面的东西）
     const dynamics = scriptContent.match(regExp);
     if (dynamics) {
@@ -214,6 +215,8 @@ class ExecuterService extends Service {
         } else if (key === HOST_TYPE) {
           if (hosts[value]) {
             ret[item] = { data: hosts[value].host };
+          } else if (value === "$SELF") {
+            ret[item] = { data: server.host };
           } else {
             ret[item] = { err: `服务器[${value}]不存在` };
           }
@@ -286,6 +289,7 @@ class ExecuterService extends Service {
         const script = item.cmds[i];
         const filePath = path.resolve(scriptDir, script);
         let scriptContent = fs.readFileSync(filePath, "utf-8");
+        this.server = server;
         const ret = this.resolveExpress(scriptContent, {});
         if (ret.err) {
           return ret;
@@ -354,18 +358,14 @@ class ExecuterService extends Service {
     const errors = [];
     const host = item.server.host;
     const password = item.server.password;
-    console.log("是的");
     const connect = this.genConn(host, password);
     const conn = connect.conn;
-    console.log("????");
     try {
       await connect.waitReady;
       let stack = [];
       let register;
-      console.log("????");
       for (let i = 0; i < item.cmds.length; ++i) {
         const cmd = item.cmds[i];
-        console.log("????");
         broadcast.cast(`NORM:[${conn.host}] ${cmd}`, this.env);
         if (cmd.startsWith(PUT_CMD)) {
           const desc = this.resolveStack(
