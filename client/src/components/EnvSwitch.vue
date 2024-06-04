@@ -50,6 +50,7 @@ export default {
     fresh() {
       fetchEnvs().then((resp) => {
         this.list = resp;
+        dataCenter.envList.value = resp;
       });
     },
     changeEnv(env) {

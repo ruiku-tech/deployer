@@ -53,18 +53,45 @@
         </el-form-item>
       </el-form>
     </div>
+    <div class="panel" style="margin-top: 10px">
+      <div class="title">api接口自动化</div>
+      <el-form ref="sslFormRef" :model="apiForm" label-width="120px">
+        <el-form-item label="host" prop="host">
+          <el-select v-model="apiForm.host">
+            <el-option
+              v-for="item in list"
+              :key="item.name"
+              :label="item.name"
+              :value="item.host"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="端口" prop="端口">
+          <el-input v-model="apiForm.port" placeholder="80" />
+        </el-form-item>
+        <el-form-item label="prefix" prop="prefix">
+          <el-input v-model="apiForm.prefix" placeholder="/api" />
+        </el-form-item>
+      </el-form>
+      <el-button type="primary" @click="api()">开始</el-button>
+    </div>
+    <div class="panel" style="margin-top: 10px">
+      <div class="title">退出登陆</div>
+      <el-button type="primary" @click="logOut()">退出</el-button>
+    </div>
   </div>
 </template>
 
 <script>
 import { ElMessage } from "element-plus";
-import { fetchHosts, run, deploySSL } from "../api";
+import { fetchHosts, run, deploySSL, apiAuto } from "../api";
 import dataCenter from "../dataCenter";
 export default {
   name: "executer",
   data() {
     return {
       hosts: [],
+      list: [],
       form: {
         host: "",
         data: "",
@@ -73,10 +100,16 @@ export default {
         host: "",
         domain: "",
       },
+      apiForm: {
+        host: "",
+        port: "",
+        prefix: "",
+      },
     };
   },
   mounted() {
     this.reload();
+    this.fresh();
   },
   methods: {
     reload() {
@@ -84,6 +117,16 @@ export default {
         this.hosts = Object.keys(data);
       });
       this.sslForm.domain = this.readDomain();
+    },
+    fresh() {
+      fetchHosts().then((data) => {
+        this.list = Object.entries(data)
+          .map(([name, value]) => {
+            const info = value.split(":");
+            return { name, host: info[0], password: info[1] };
+          })
+          .sort((a, b) => (a.host === b.host ? 0 : a.host > b.host ? 1 : -1));
+      });
     },
     commit() {
       if (!this.form.host) {
@@ -118,9 +161,18 @@ export default {
       const env = dataCenter.env.value;
       return localStorage.getItem(`${env}-domain`) || "";
     },
+    api() {
+      console.log(this.apiForm.host);
+      if (!this.apiForm.host) {
+        return ElMessage.error("请选择host");
+      }
+      apiAuto(this.apiForm.host, this.apiForm.port, this.apiForm.prefix);
+    },
+    logOut() {
+      dataCenter.user.value = "";
+    },
   },
 };
 </script>
 
-<style>
-</style>
+<style></style>

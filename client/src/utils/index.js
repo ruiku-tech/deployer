@@ -11,8 +11,8 @@ export function confirmDelete(msg) {
 }
 export function prodConfirm() {
   const env = dataCenter.env.value;
-  const isProd = env.startsWith("prod");
-  if (!isProd) {
+  const isTest = env.includes("test") || env.includes("dev");
+  if (isTest) {
     return Promise.resolve();
   }
   return new Promise((resolve, reject) => {

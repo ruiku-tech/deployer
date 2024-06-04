@@ -1,7 +1,7 @@
 import service from "./base";
 
-export function deploy(list, files) {
-  return service.post("/deploy", { list, files });
+export function deploy(list, env, files) {
+  return service.post("/deploy", { list, env, files });
 }
 
 // host:pasword

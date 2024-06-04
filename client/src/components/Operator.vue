@@ -5,6 +5,9 @@
         <el-tab-pane label="文件管理" name="files"
           ><Files ref="files"
         /></el-tab-pane>
+        <el-tab-pane label="发布记录" name="record">
+          <Record ref="record" />
+        </el-tab-pane>
         <el-tab-pane label="全局变量" name="vars"
           ><Vars ref="vars"
         /></el-tab-pane>
@@ -39,7 +42,7 @@ import Configs from "./Configs.vue";
 import Scripts from "./Scripts.vue";
 import Deploys from "./Deploys.vue";
 import Executer from "./Executer.vue";
-
+import Record from "./Record.vue";
 import dataCenter from "../dataCenter";
 
 export default {
@@ -59,6 +62,7 @@ export default {
     Scripts,
     Deploys,
     Executer,
+    Record,
   },
   methods: {
     onTabChange(tab) {
@@ -77,7 +81,7 @@ export default {
 #operator {
   flex: 1;
 }
-.info{
+.info {
   font-size: 20px;
   height: 100%;
 }

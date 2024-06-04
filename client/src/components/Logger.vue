@@ -2,13 +2,12 @@
   <div class="right">
     <div class="deploying">
       <div class="title">部署中</div>
+      <el-checkbox-group v-model="envList">
+        <el-checkbox-button v-for="env in dataCenter.envList" :label="env" :key="env">{{ env.name
+          }}</el-checkbox-button>
+      </el-checkbox-group>
       <div class="list">
-        <el-tag
-          v-for="deploying in deployings"
-          :key="deploying"
-          closable
-          @close="stop(deploying)"
-        >
+        <el-tag v-for="deploying in deployings" :key="deploying" closable @close="stop(deploying)">
           {{ deploying }}
         </el-tag>
       </div>
@@ -19,14 +18,16 @@
 
 <script>
 import { getDeployings, stopDeploy } from "../api";
+import dataCenter from "../dataCenter";
 import { confirmDelete } from "../utils";
 import dayjs from "dayjs";
-
 export default {
   name: "logger",
   data() {
     return {
       deployings: [],
+      dataCenter,
+      envList: [{ name: dataCenter.env.value }],
     };
   },
   mounted() {
@@ -63,7 +64,7 @@ export default {
       let wsUrl = baseUrl.replace("http", "ws");
       // 兼容测试环境和正式环境
       if (!baseUrl.startsWith("http")) {
-        wsUrl = "ws://" + location.host;
+        wsUrl = "ws://" + location.host + baseUrl;
       }
       var ws = new WebSocket(wsUrl);
       ws.onmessage = (e) => {
@@ -88,14 +89,18 @@ export default {
     addLog(info) {
       const log = info.split(":");
       var line = document.createElement("pre");
-      line.className = `item ${log[0]}`;
-      if (log[0] === "NORM") {
-        line.textContent = `${log.slice(1).join(":")} @${dayjs().format('MM-DD hh:mm:ss')}`;
-      } else {
-        line.textContent = log.slice(1).join(":");
+      line.className = `item ${log[0] == "环境" ? log[2] : log[0]}`;
+      if (this.envList.find((obj) => obj.name === log[1]) || log[0] != "环境") {
+        if (log[2] === "NORM") {
+          line.textContent = `${log.slice(1).join(":")} @${dayjs().format(
+            "MM-DD hh:mm:ss"
+          )}`;
+        } else {
+          line.textContent = log.slice(1).join(":");
+        }
+        this.logger.appendChild(line);
+        this.logger.scrollTo(0, this.logger.scrollHeight);
       }
-      this.logger.appendChild(line);
-      this.logger.scrollTo(0, this.logger.scrollHeight);
     },
   },
 };
@@ -110,12 +115,14 @@ export default {
   overflow: hidden;
   flex: 1;
 }
+
 .deploying {
   height: 36px;
   display: flex;
   flex-direction: row;
   border: 1px solid #eee;
 }
+
 .deploying .title {
   padding: 0 10px;
   background: #f0f0f0;
@@ -124,6 +131,7 @@ export default {
   align-items: center;
   margin-right: 10px;
 }
+
 .deploying .list {
   flex: 1;
   overflow-x: scroll;
@@ -131,6 +139,7 @@ export default {
   flex-direction: row;
   align-items: center;
 }
+
 #logger {
   flex: 1;
   background-color: #000;
@@ -140,6 +149,7 @@ export default {
   padding: 10px;
   box-sizing: border-box;
 }
+
 #logger .item {
   padding: 0 2px;
   text-align: left;
@@ -148,9 +158,11 @@ export default {
   border-radius: 2px;
   margin: 1px 0;
 }
+
 #logger .ERR {
   color: #ee0000;
 }
+
 #logger .NORM {
   color: #0e0;
 }

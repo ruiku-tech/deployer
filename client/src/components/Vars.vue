@@ -76,7 +76,7 @@ export default {
         this.list = data
           .split("\n")
           .map((line) => {
-            const info = line.split(":");
+            const info = line.split(">>");
             return { name: info[0], value: info[1] };
           })
           .sort((a, b) => (a.name > b.name ? 1 : -1));
@@ -117,7 +117,7 @@ export default {
         return ret;
       }, {});
       const data = Object.entries(merged)
-        .map(([k, v]) => `${k}:${v}`)
+        .map(([k, v]) => `${k}>>${v}`)
         .join("\n");
       return saveVars(data).then(this.fresh);
     },
