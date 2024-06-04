@@ -34,7 +34,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "egg-scripts start --daemon --title=egg-server-server",
+    "start": "egg-scripts start --daemon --title=egg-server-server --workers=1",
     "stop": "egg-scripts stop --title=egg-server-server",
     "dev": "egg-bin dev --port 3000",
     "test": "npm run lint -- --fix && npm run test:local",
