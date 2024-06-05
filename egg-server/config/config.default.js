@@ -52,7 +52,7 @@ module.exports = (appInfo) => {
   };
   config.mongoose = {
     client: {
-      url: "mongodb://43.132.219.112:33017/server_database",
+      url: "mongodb://127.0.0.1:33017/server_database",
       options: {
         useNewUrlParser: true,
         useUnifiedTopology: true,
