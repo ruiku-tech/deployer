@@ -1,18 +1,18 @@
-const { Controller } = require("egg");
-const install = require("../service/install");
-const path = require("path");
-const fs = require("fs");
-const util = require("util");
+const { Controller } = require('egg');
+const install = require('../service/install');
+const path = require('path');
+const fs = require('fs');
+const util = require('util');
 class envController extends Controller {
   // 获取环境列表
   async getList() {
     const { ctx } = this;
-    const workspaceDir = path.resolve(__dirname, "../../workspace");
+    const workspaceDir = path.resolve(__dirname, '../../workspace');
     try {
       const readdir = util.promisify(fs.readdir);
       const files = await readdir(workspaceDir);
       ctx.body = {
-        data: files.filter((name) => name !== "user").map((name) => ({ name })),
+        data: files.filter(name => name !== 'user').map(name => ({ name })),
       };
     } catch (err) {
       ctx.body = { err };
@@ -31,7 +31,7 @@ class envController extends Controller {
         .then(() => {
           body = {};
         })
-        .catch((err) => {
+        .catch(err => {
           body = { err };
         });
     } else {
@@ -50,7 +50,7 @@ class envController extends Controller {
       .then(() => {
         ctx.body = {};
       })
-      .catch((err) => {
+      .catch(err => {
         ctx.body = { err };
       });
   }

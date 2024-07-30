@@ -1,9 +1,9 @@
-const fs = require("fs");
-const acme = require("acme-client");
-const execSync = require("child_process").execSync;
-const path = require("path");
-const dayjs = require("dayjs");
-const broadcast = require("./broadcast");
+const fs = require('fs');
+const acme = require('acme-client');
+const execSync = require('child_process').execSync;
+const path = require('path');
+const dayjs = require('dayjs');
+const broadcast = require('./broadcast');
 let cxt;
 function checkDir(dirPath) {
   const parentDir = path.dirname(dirPath);
@@ -15,9 +15,9 @@ function checkDir(dirPath) {
 // 在验证过程中自动创建验证文件并放置
 async function createHttpChallenge(server, authz, challenge, keyAuthorization) {
   const token = challenge.token;
-  broadcast.cast(`INFO:开始创建验证文件`);
+  broadcast.cast('INFO:开始创建验证文件');
   const fileDir = this.fileDir;
-  const time = dayjs().format("YYYYMMDD-HH:mm:ss");
+  const time = dayjs().format('YYYYMMDD-HH:mm:ss');
   const challengePath = path.resolve(fileDir, `${time}~${token}`);
   fs.writeFileSync(challengePath, keyAuthorization);
   await ctx.service.executer.deployList([
@@ -25,7 +25,7 @@ async function createHttpChallenge(server, authz, challenge, keyAuthorization) {
       server,
       cmds: [
         `put: ${challengePath},/root/acme/${token}`,
-        "run: docker exec gateway nginx -s reload",
+        'run: docker exec gateway nginx -s reload',
       ],
     },
   ]);
@@ -43,10 +43,10 @@ async function requestCertificate(server, domain, ctx1) {
     accountKey: privateKey,
   });
 
-  const time = dayjs().format("YYYYMMDD-HH:mm:ss");
+  const time = dayjs().format('YYYYMMDD-HH:mm:ss');
   const certPath = path.resolve(fileDir, `${time}~${domain}-cert.pem`);
   const keyPath = path.resolve(fileDir, `${time}~${domain}-key.pem`);
-  const [key, csr] = await acme.forge.createCsr({
+  const [ key, csr ] = await acme.forge.createCsr({
     commonName: domain,
   });
 
@@ -59,17 +59,17 @@ async function requestCertificate(server, domain, ctx1) {
   try {
     const cert = await client.auto({
       csr,
-      email: "cqxx1990@outlook.com",
+      email: 'cqxx1990@outlook.com',
       termsOfServiceAgreed: true,
-      challengePriority: ["http-01"],
+      challengePriority: [ 'http-01' ],
       challengeCreateFn,
     });
   } catch (error) {
-    console.log(error, "什么问题");
+    console.log(error, '什么问题');
   }
   // 保存证书和密钥
-  fs.writeFileSync(certPath, cert, "utf-8");
-  fs.writeFileSync(keyPath, key, "utf-8");
+  fs.writeFileSync(certPath, cert, 'utf-8');
+  fs.writeFileSync(keyPath, key, 'utf-8');
 
   broadcast.cast(`INFO:${domain}证书生成完毕，开始部署`);
 
@@ -79,7 +79,7 @@ async function requestCertificate(server, domain, ctx1) {
       cmds: [
         `put: ${certPath},/root/cert/cert.pem`,
         `put: ${keyPath},/root/cert/key.pem`,
-        "run: docker exec gateway nginx -s reload",
+        'run: docker exec gateway nginx -s reload',
       ],
     },
   ]);

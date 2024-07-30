@@ -1,35 +1,35 @@
-var Client = require("ssh2").Client;
-const broadcast = require("./broadcast");
-const fs = require("fs");
-const path = require("path");
-const dayjs = require("dayjs");
-const utils = require("./utils");
-const { Service } = require("egg");
+const Client = require('ssh2').Client;
+const broadcast = require('./broadcast');
+const fs = require('fs');
+const path = require('path');
+const dayjs = require('dayjs');
+const utils = require('./utils');
+const { Service } = require('egg');
 const regExp = /\[(VAR|FILE|CONF|HOST):.+?\]/g;
 const funMap = {};
-const VAR_TYPE = "VAR";
-const FILE_TYPE = "FILE";
-const CFG_TYPE = "CONF";
-const HOST_TYPE = "HOST";
-const RUN_CMD = "run:";
-const PUT_CMD = "put:";
-const GET_CMD = "get:";
-const QUERY_CMD = "rquery:";
-const RPUSH_CMD = "spush:";
-const RPOP_CMD = "spop:";
-const EVAL_CMD = "reval:";
-const UPDATE_CMD = "update:";
+const VAR_TYPE = 'VAR';
+const FILE_TYPE = 'FILE';
+const CFG_TYPE = 'CONF';
+const HOST_TYPE = 'HOST';
+const RUN_CMD = 'run:';
+const PUT_CMD = 'put:';
+const GET_CMD = 'get:';
+const QUERY_CMD = 'rquery:';
+const RPUSH_CMD = 'spush:';
+const RPOP_CMD = 'spop:';
+const EVAL_CMD = 'reval:';
+const UPDATE_CMD = 'update:';
 
 deploying = [];
 
 class ExecuterService extends Service {
   constructor(ctx) {
     super(ctx);
-    this.env = "";
+    this.env = '';
     setInterval(() => {
       const now = Date.now();
       const maxTime = 3 * 60 * 1000;
-      deploying.forEach((item) => {
+      deploying.forEach(item => {
         if (!item.using && now - item.timer > maxTime) {
           item.close();
         }
@@ -39,7 +39,7 @@ class ExecuterService extends Service {
   getFile(conn, srcFile, distFile) {
     const env = this.env;
     return new Promise((resolve, reject) => {
-      conn.sftp(function (err, sftp) {
+      conn.sftp(function(err, sftp) {
         if (err) return reject(err);
         let now = Date.now();
         // 下载文件
@@ -47,7 +47,7 @@ class ExecuterService extends Service {
           srcFile,
           distFile,
           {
-            step: function (transferred, chunk, total) {
+            step(transferred, chunk, total) {
               if (Date.now() - now > 1000 || transferred >= total) {
                 now = Date.now();
                 broadcast.cast(
@@ -60,7 +60,7 @@ class ExecuterService extends Service {
               }
             },
           },
-          function (err) {
+          function(err) {
             if (err) {
               broadcast.cast(`ERR:[${conn.host}] ${err.message}`, env);
               return reject(err);
@@ -75,7 +75,7 @@ class ExecuterService extends Service {
   putFile(conn, srcFile, distFile) {
     const env = this.env;
     return new Promise((resolve, reject) => {
-      conn.sftp(function (err, sftp) {
+      conn.sftp(function(err, sftp) {
         if (err) return reject(err);
         let now = Date.now();
         // 上传文件
@@ -84,10 +84,10 @@ class ExecuterService extends Service {
             srcFile,
             distFile,
             {
-              step: function (transferred, chunk, total) {
+              step(transferred, chunk, total) {
                 if (Date.now() - now > 1000 || transferred >= total) {
                   now = Date.now();
-                  console.log(conn.host, "12", "不对行");
+                  console.log(conn.host, '12', '不对行');
                   broadcast.cast(
                     `INFO:[${conn.host}] 进度:${(
                       (transferred * 100) /
@@ -98,7 +98,7 @@ class ExecuterService extends Service {
                 }
               },
             },
-            function (err) {
+            function(err) {
               if (err) {
                 broadcast.cast(`ERR:[${conn.host}] ${err.message}`, env);
                 return reject(err);
@@ -116,11 +116,11 @@ class ExecuterService extends Service {
   execute(conn, cmd) {
     const env = this.env;
     return new Promise((resolve, reject) => {
-      let buffer = "";
-      conn.exec(cmd, function (err, stream) {
+      let buffer = '';
+      conn.exec(cmd, function(err, stream) {
         if (err) return reject(err);
         stream
-          .on("close", function (code, signal) {
+          .on('close', function(code, signal) {
             if (buffer) {
               broadcast.cast(`INFO:[${conn.host}] ${buffer}`, env);
             }
@@ -135,17 +135,17 @@ class ExecuterService extends Service {
               resolve();
             }
           })
-          .on("data", function (data) {
+          .on('data', function(data) {
             buffer += data.toString();
-            if (buffer.includes("\n")) {
-              const arr = buffer.split("\n");
+            if (buffer.includes('\n')) {
+              const arr = buffer.split('\n');
               arr
                 .slice(0, -1)
-                .map((l) => broadcast.cast(`INFO:[${conn.host}] ${l}`, env));
+                .map(l => broadcast.cast(`INFO:[${conn.host}] ${l}`, env));
               buffer = arr[arr.length - 1];
             }
           })
-          .stderr.on("data", function (data) {
+          .stderr.on('data', function(data) {
             broadcast.cast(`ERR:[${conn.host}] ${data}`, env);
           });
       });
@@ -155,16 +155,16 @@ class ExecuterService extends Service {
     const env = this.env;
     return new Promise((resolve, reject) => {
       const result = [];
-      conn.exec(cmd, function (err, stream) {
+      conn.exec(cmd, function(err, stream) {
         if (err) return reject(err);
         stream
-          .on("close", function (code, signal) {
-            resolve(result.join(""));
+          .on('close', function(code, signal) {
+            resolve(result.join(''));
           })
-          .on("data", function (data) {
+          .on('data', function(data) {
             result.push(data);
           })
-          .stderr.on("data", function (data) {
+          .stderr.on('data', function(data) {
             rbroadcast.cast(`ERR:[${conn.host}] ${data}`, env);
           });
       });
@@ -183,7 +183,7 @@ class ExecuterService extends Service {
     const dynamics = scriptContent.match(regExp);
     if (dynamics) {
       const map = dynamics.reduce((ret, item) => {
-        const arr = item.split(":");
+        const arr = item.split(':');
         const key = arr[0].slice(1);
         const value = arr[1].slice(0, -1).trim();
         if (key === CFG_TYPE) {
@@ -191,7 +191,7 @@ class ExecuterService extends Service {
             ret[item] = { err: `配置[${value}]内有循环引用` };
           } else {
             const filePath = path.resolve(configDir, value);
-            const configContent = fs.readFileSync(filePath, "utf-8");
+            const configContent = fs.readFileSync(filePath, 'utf-8');
             if (configContent) {
               from[value] = 1;
               const the = this.resolveExpress(configContent, from);
@@ -202,9 +202,9 @@ class ExecuterService extends Service {
                   ret[item] = { data: filePath };
                 } else {
                   const now = dayjs();
-                  const time = now.format("YYYYMMDD-HH:mm:ss");
+                  const time = now.format('YYYYMMDD-HH:mm:ss');
                   const newPath = path.resolve(tempDir, `${time}~${value}`);
-                  fs.writeFileSync(newPath, the.data, "utf-8");
+                  fs.writeFileSync(newPath, the.data, 'utf-8');
                   ret[item] = { data: newPath };
                 }
               }
@@ -215,7 +215,7 @@ class ExecuterService extends Service {
         } else if (key === HOST_TYPE) {
           if (hosts[value]) {
             ret[item] = { data: hosts[value].host };
-          } else if (value === "$SELF") {
+          } else if (value === '$SELF') {
             ret[item] = { data: server.host };
           } else {
             ret[item] = { err: `服务器[${value}]不存在` };
@@ -239,11 +239,11 @@ class ExecuterService extends Service {
         }
         return ret;
       }, {});
-      const errors = Object.values(map).filter((item) => item.err);
+      const errors = Object.values(map).filter(item => item.err);
       if (errors.length) {
-        return { err: errors.map((item) => item.err).join(",") };
+        return { err: errors.map(item => item.err).join(',') };
       }
-      scriptContent = scriptContent.replace(regExp, ($1) => {
+      scriptContent = scriptContent.replace(regExp, $1 => {
         return map[$1].data;
       });
     }
@@ -252,7 +252,7 @@ class ExecuterService extends Service {
   cmdEval(script, register) {
     let fun = funMap[script];
     if (!fun) {
-      fun = funMap[script] = new Function("$", `return ${script}`);
+      fun = funMap[script] = new Function('$', `return ${script}`);
     }
     return fun(register);
   }
@@ -260,12 +260,12 @@ class ExecuterService extends Service {
   // "AAAA$[0],$[1]"
   resolveStack(cmd, stack) {
     return cmd.replace(/\$\[(\d+?)\]/g, ($0, $1) => {
-      return stack[stack.length - 1 - $1] || "";
+      return stack[stack.length - 1 - $1] || '';
     });
   }
   updateVars(item) {
     const vars = utils.parseVars();
-    const arr = item.split("=");
+    const arr = item.split('=');
     vars[arr[0]] = arr[1];
     utils.saveVars(vars);
   }
@@ -288,7 +288,7 @@ class ExecuterService extends Service {
       for (let i = 0; i < item.cmds.length; i++) {
         const script = item.cmds[i];
         const filePath = path.resolve(scriptDir, script);
-        let scriptContent = fs.readFileSync(filePath, "utf-8");
+        let scriptContent = fs.readFileSync(filePath, 'utf-8');
         this.server = server;
         const ret = this.resolveExpress(scriptContent, {});
         if (ret.err) {
@@ -297,17 +297,18 @@ class ExecuterService extends Service {
         scriptContent = ret.data;
         cmds.push(
           ...scriptContent
-            .split("\n")
-            .filter((line) => !line.trim().startsWith("#"))
+            .split('\n')
+            .filter(line => !line.trim().startsWith('#'))
         );
       }
-      return { server, cmds: cmds.filter((cmd) => cmd) };
+      return { server, cmds: cmds.filter(cmd => cmd) };
     });
   }
   genConn(host, password) {
-    let item = deploying.find((item) => item.host === host);
+    let item = deploying.find(item => item.host === host);
     if (!item) {
-      let readyResolve, readyReject;
+      let readyResolve,
+        readyReject;
       const waitReady = new Promise((resolve, reject) => {
         readyResolve = resolve;
         readyReject = reject;
@@ -319,14 +320,14 @@ class ExecuterService extends Service {
         .connect({
           host,
           port: 22,
-          username: "root",
+          username: 'root',
           password,
         })
-        .on("ready", readyResolve)
-        .on("close", () => {
+        .on('ready', readyResolve)
+        .on('close', () => {
           broadcast.cast(`NORM:[${item.host}] 断开连接`, this.env);
           readyReject();
-          const index = deploying.findIndex((item) => item.host === host);
+          const index = deploying.findIndex(item => item.host === host);
           if (index >= 0) {
             deploying.splice(index, 1);
           }
@@ -362,7 +363,7 @@ class ExecuterService extends Service {
     const conn = connect.conn;
     try {
       await connect.waitReady;
-      let stack = [];
+      const stack = [];
       let register;
       for (let i = 0; i < item.cmds.length; ++i) {
         const cmd = item.cmds[i];
@@ -373,7 +374,7 @@ class ExecuterService extends Service {
             stack,
             host
           );
-          const paths = desc.split(",");
+          const paths = desc.split(',');
           await this.putFile(conn, paths[0], paths[1]);
         } else if (cmd.startsWith(GET_CMD)) {
           const desc = this.resolveStack(
@@ -381,7 +382,7 @@ class ExecuterService extends Service {
             stack,
             host
           );
-          const paths = desc.split(",");
+          const paths = desc.split(',');
           await this.getFile(conn, paths[0], paths[1]);
         } else if (cmd.startsWith(RUN_CMD)) {
           const desc = this.resolveStack(
@@ -424,7 +425,7 @@ class ExecuterService extends Service {
   }
 
   async deployList(list) {
-    console.log(list, "真美");
+    console.log(list, '真美');
     for (let i = 0; i < list.length; ++i) {
       const item = list[i];
       await this.deply(item);
@@ -432,14 +433,14 @@ class ExecuterService extends Service {
   }
 
   run(server, cmd) {
-    return this.deply({ server, cmds: [cmd] });
+    return this.deply({ server, cmds: [ cmd ] });
   }
 
   getDeployings() {
-    return deploying.map((item) => item.host);
+    return deploying.map(item => item.host);
   }
   stopDeploy(host) {
-    const item = deploying.find((item) => item.host === host);
+    const item = deploying.find(item => item.host === host);
     if (item) {
       item.close();
     }

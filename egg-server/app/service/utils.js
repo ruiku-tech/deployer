@@ -1,10 +1,10 @@
-const fs = require("fs");
+const fs = require('fs');
 
-const varSpliter = '>>'
+const varSpliter = '>>';
 
 function parseVars() {
-  const varStr = fs.readFileSync(this.varsFile, "utf-8");
-  const lines = varStr.split("\n");
+  const varStr = fs.readFileSync(this.varsFile, 'utf-8');
+  const lines = varStr.split('\n');
   return lines.reduce((ret, item) => {
     const arr = item.split(varSpliter);
     if (arr[0]) {
@@ -15,14 +15,14 @@ function parseVars() {
 }
 function saveVars(varObj) {
   const varStr = Object.entries(varObj)
-    .map(([k, v]) => `${k}${varSpliter}${v}`)
-    .join("\n");
-  fs.writeFileSync(this.varsFile, varStr, "utf-8");
+    .map(([ k, v ]) => `${k}${varSpliter}${v}`)
+    .join('\n');
+  fs.writeFileSync(this.varsFile, varStr, 'utf-8');
 }
 function parseHosts() {
-  const ret = JSON.parse(fs.readFileSync(this.hostsFile, "utf-8") || "{}");
+  const ret = JSON.parse(fs.readFileSync(this.hostsFile, 'utf-8') || '{}');
   return Object.entries(ret).reduce((ret, item) => {
-    const info = item[1].split(":");
+    const info = item[1].split(':');
     ret[item[0]] = { host: info[0], password: info[1] };
     return ret;
   }, {});

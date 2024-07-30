@@ -1,4 +1,4 @@
-module.exports = (app) => {
+module.exports = app => {
   const mongoose = app.mongoose;
   const Schema = mongoose.Schema;
 
@@ -7,5 +7,5 @@ module.exports = (app) => {
     password: { type: String, required: true },
   });
 
-  return mongoose.model("User", LoginSchema);
+  return mongoose.model('User', LoginSchema);
 };

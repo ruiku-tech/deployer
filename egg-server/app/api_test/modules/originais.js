@@ -1,4 +1,4 @@
-const broadcast = require("../../service/broadcast");
+const broadcast = require('../../service/broadcast');
 
 class Originais {
   constructor(owner) {
@@ -10,29 +10,33 @@ class Originais {
     await this.playGameRocket(2, 10);
     await this.playGameDice(50, 1, 10);
   }
-  /** 火箭游戏 */
+  /**
+   * 火箭游戏
+   * @param targetRate
+   * @param betAmount
+   */
   async playGameRocket(targetRate, betAmount) {
     const playGameRocketReq = {
-      name: "火箭游戏",
+      name: '火箭游戏',
       param: {
         gameId: 3,
       },
       json: {
-        targetRate: targetRate,
-        betAmount: betAmount,
+        targetRate,
+        betAmount,
         currencyId: 1,
       },
     };
     try {
       const data = await this.owner.post(
         playGameRocketReq.name,
-        "/v1/userPlay/playGame?gameId=3",
+        '/v1/userPlay/playGame?gameId=3',
         playGameRocketReq.json
       );
       if (!data.data.currencyId) {
-        broadcast.cast(`ERR:currencyId字段缺失`);
+        broadcast.cast('ERR:currencyId字段缺失');
       } else if (!data.data.balance) {
-        broadcast.cast(`ERR:金额字段缺失`);
+        broadcast.cast('ERR:金额字段缺失');
       } else {
         broadcast.cast(`:${playGameRocketReq.name}验证通过`);
       }
@@ -40,30 +44,35 @@ class Originais {
       broadcast.cast(`:${playGameRocketReq.name}验证失败`);
     }
   }
-  /** 骰子 */
+  /**
+   * 骰子
+   * @param predictedValue
+   * @param highOrLow
+   * @param betAmount
+   */
   async playGameDice(predictedValue, highOrLow, betAmount) {
     const playGameDiceReq = {
-      name: "骰子",
+      name: '骰子',
       param: {
         gameId: 1,
       },
       json: {
-        predictedValue: predictedValue,
-        highOrLow: highOrLow,
-        betAmount: betAmount,
+        predictedValue,
+        highOrLow,
+        betAmount,
         currencyId: 1,
       },
     };
     try {
       const data = await this.owner.post(
         playGameDiceReq.name,
-        "/v1/userPlay/playGame?gameId=1",
+        '/v1/userPlay/playGame?gameId=1',
         playGameDiceReq.json
       );
       if (!data.data.currencyId) {
-        broadcast.cast(`ERR:currencyId字段缺失`);
+        broadcast.cast('ERR:currencyId字段缺失');
       } else if (!data.data.balance) {
-        broadcast.cast(`ERR:金额字段缺失`);
+        broadcast.cast('ERR:金额字段缺失');
       } else {
         broadcast.cast(`:${playGameDiceReq.name}验证通过`);
       }
