@@ -156,9 +156,9 @@ class DeployController extends Controller {
     }
 
     console.log("req", req.body, "currEnv:{}", req.headers.env);
-    // const workspaceDir = path.resolve(__dirname, '../../workspace/files/');
-    const currentFilePath = path.resolve(__dirname, 'workspace', env, 'files', fileName);
-    const targetFilePath = path.resolve(__dirname, 'workspace', targetEnv, 'files', fileName);
+    const basePath = path.resolve(__dirname, '../../workspace');
+    const currentFilePath = path.resolve(basePath, env, 'files', fileName);
+    const targetFilePath = path.resolve(basePath, targetEnv, 'files', fileName);
     console.log("当前文件夹: ", currentFilePath);
     console.log("目标文件夹: ", targetFilePath);
 

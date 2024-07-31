@@ -112,11 +112,9 @@ export default {
         ElMessage.warning('请选择一个选项');
         return;
       }
-      ElMessage.success(`您选择的是: ${selectedOption.value}`);
       APICloneFileToTargetEnv(file.value, selectedOption.value).then(resp =>{
-
+        ElMessage.success(`文件已克隆至 ${selectedOption.value}`);
       })
-
       showClone.value = false;
     };
 
