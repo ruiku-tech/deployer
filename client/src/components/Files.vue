@@ -121,6 +121,7 @@ export default {
     const handleCancel = () => {
       showClone.value = false;
       ElMessage.info('取消克隆');
+      options.value = [];
     };
 
     const handleClose = () => {
