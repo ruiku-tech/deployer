@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../service/config');
 const pump = require('mz-modules/pump');
+const fileMemo = require('../model/FileMemo');
 
 const userFile = config.userFile();
 const storage = multer.diskStorage({
@@ -77,10 +78,19 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
 
     try {
-      const files = await readdir(req.context.fileDir);
-      ctx.body = { data: files.map(file => ({ file })) };
+      // 读取文件目录
+      const files = await fs.readdir(req.context.fileDir);
+      console.log("filename : {}",files)
+      const filesWithMemo = await Promise.all(files.map(async file => {
+        console.log("filename : {}",file   , "     ",file.filename())
+        const fileMemos = await fileMemo.findOne({ fileName: file }).sort({ uploadTime: -1 });
+        const fileWithMemo = fileMemos ? `${file}||${fileMemos.memo}` : file;
+        return { file: fileWithMemo };
+      }));
+
+      ctx.body = { data: filesWithMemo };
     } catch (err) {
-      ctx.body = { err };
+      ctx.body = { err: err.message };
     }
   }
 
@@ -89,11 +99,20 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     try {
       const files = await readdir(req.context.fileDir);
+      console.log("filename : {}",files)
       const stats = await Promise.all(
         files.map(file =>
           this.queryFileStat(path.resolve(req.context.fileDir, file))
         )
       );
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileMemos = await fileMemo.findOne({ fileName: file }).sort({ uploadTime: -1 });
+        if (fileMemos) {
+          files[i] = `${file}||${fileMemos.memo}`;
+        }
+        console.log("filenamesssssss:{}", fileMemos);
+      }
       ctx.body = {
         data: files.map((file, index) => ({ file, size: stats[index] })),
       };
@@ -112,7 +131,8 @@ class DeployController extends Controller {
     const time = dayjs().format('YYYYMMDD-HH:mm:ss');
     console.log('文件名称：「」，memo：「」。', stream.filename, memo);
     const baseName = `${time}~${path.basename(stream.filename)}`;
-    const fileName = memo ? `${baseName}||${memo}` : baseName;
+    const fileName = memo ? `${baseName}` : baseName;
+    // const fileName = memo ? `${baseName}||${memo}` : baseName;
     // 生成目标文件路径
     const targetPath = path.resolve(req.context.fileDir, fileName);
     // 确保目标目录存在
@@ -121,6 +141,14 @@ class DeployController extends Controller {
     const writeStream = fs.createWriteStream(targetPath);
     // 使用 pump 将文件流传输到写流
     await pump(stream, writeStream);
+    try {
+
+      const fileDocument = new fileMemo({ fileName, memo });
+      await fileDocument.save();
+    } catch (err) {
+      console.error('Error saving file to MongoDB:', err);
+      ctx.throw(500, 'Error saving file to MongoDB');
+    }
 
     // 删除老的三个文件
     const files = await fs.promises.readdir(req.context.fileDir);
@@ -135,6 +163,7 @@ class DeployController extends Controller {
     const filesToDelete = sortedFiles.slice(3).map(f => f.file);
     for (const file of filesToDelete) {
       await fs.promises.unlink(path.resolve(req.context.fileDir, file));
+      fileMemo.deleteOne({ fileName: file });
     }
     ctx.body = { data: 'success' };
   }

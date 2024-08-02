@@ -151,25 +151,6 @@ export default {
     this.fresh();
   },
   methods: {
-
-    cloneFile(item) {
-      const options = [];
-      fetchEnvs().then((resp) => {
-        resp.forEach(item => {
-          options.push({ label: item.name, value: item.name });
-        });
-        const env = confirmClone(options).then(resp => {
-          if(resp == null){
-            return
-          }
-          console.log("选择的环境 ：「」",resp.value)
-          // cloneFile()
-          // deleteFile(item.file).then(() => {
-          //   setTimeout(this.fresh, 1000);
-          // });
-        });
-      });
-    },
     fresh() {
       fetchFilesStat().then(
         (list) => (this.list = list.sort((a, b) => (a.file > b.file ? 1 : -1)))

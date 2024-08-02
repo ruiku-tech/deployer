@@ -1,7 +1,10 @@
 /**
  * @param {Egg.Application} app - egg application
  */
+const mongoose = require('mongoose');
+mongoose.set('debug', true);
 module.exports = app => {
+
   const deployMiddle = app.middleware.deployMiddle();
   const { router, controller } = app;
   // router.get("/", controller.home.index);
@@ -114,4 +117,16 @@ module.exports = app => {
   router.post('/deploy/env/one', controller.env.postOne);
   // 删除配置
   router.delete('/deploy/env/one', controller.env.deleteOne);
+
+  const { client } = app.config.mongoose;
+  mongoose.connect(client.url, client.options)
+      .then(() => {
+        console.log('MongoDB connected successfully');
+        app.listen(app.config.port, () => {
+          console.log(`Server is running at http://localhost:${app.config.port}`);
+        });
+      })
+      .catch(err => {
+        console.error('MongoDB connection error:', err);
+      });
 };
