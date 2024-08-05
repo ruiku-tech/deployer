@@ -6,8 +6,11 @@ export function deploy(list, env, files) {
 
 // host:pasword
 // 脚本
-export function run(server, cmd) {
-  return service.post("/run", { server, cmd });
+export function run(server, cmd,cache ) {
+  return service.post("/run", { server, cmd ,cache});
+}
+export function APIGetHistoryScript() {
+  return service.post("/script/detail");
 }
 
 export function getDeployings() {

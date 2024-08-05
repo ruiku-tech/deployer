@@ -10,6 +10,7 @@ const path = require('path');
 const config = require('../service/config');
 const pump = require('mz-modules/pump');
 const fileMemo = require('../model/FileMemo');
+const scriptRecord = require('../model/ScriptRecord');
 
 const userFile = config.userFile();
 const storage = multer.diskStorage({
@@ -525,12 +526,38 @@ class DeployController extends Controller {
       ctx.body = { err };
     }
   }
+  async scriptDetail(ctx){
+    const { request: req, response: res } = ctx;
+    const page = req.body.page;
+    const limit = req.body.limit;
+    // 将 page 和 limit 转换为整数
+    const pageNumber = parseInt(page, 10) || 1; // 默认第一页
+    const pageSize = parseInt(limit, 10) || 10; // 默认每页 10 条
+
+    // 计算跳过的文档数量
+    const skip = (pageNumber - 1) * pageSize;
+    // 查询文档并按时间倒序排序，进行分页
+    const scripts = await scriptRecord.find()
+        .sort({ uploadTime: -1 }) // 按 uploadTime 倒序排序
+        .skip(skip)
+        .limit(pageSize);
+
+    // 获取总文档数量，用于计算总页数
+    // const totalDocuments = await fileDocument.countDocuments();
+    // const totalPages = Math.ceil(totalDocuments / pageSize);
+    ctx.body = { data: scripts };
+  }
   async postRun(ctx) {
     const { request: req, response: res } = ctx;
     const hosts = utils.parseHosts.call(req.context);
     const server = hosts[req.body.server];
     if (!server) {
       return (ctx.body = { err: `找不到服务器:${req.body.server}` });
+    }
+    const text = req.body.cmd;
+    if(req.body.cache){
+      const fileDocument = new scriptRecord({ text });
+      fileDocument.save();
     }
     await ctx.service.executer
       .run(server, req.body.cmd)
