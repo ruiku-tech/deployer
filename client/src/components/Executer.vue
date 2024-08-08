@@ -84,8 +84,9 @@
     </div>
   </div>
   <el-drawer v-model="drawer" title="历史记录" :with-header="true" direction="rtl">
-    <el-table :data="anchorData" style="width: 100%">
-      <el-table-column prop="text" label="脚本内容"></el-table-column>
+    <el-table :data="anchorData" style="width: 100%" @cell-click="clickText">
+      <el-table-column prop="text" label="脚本内容">
+      </el-table-column>
     </el-table>
   </el-drawer>
 </template>
@@ -122,12 +123,18 @@ export default {
   mounted() {
     this.reload();
     this.fresh();
+    this.anchorData = [];
   },
   methods: {
+    clickText(row, column, cell, event){
+      this.drawer = false;
+      this.form.data = row.text
+    },
     showHistoryScript(){
       this.drawer = true
+      if(this.anchorData.length > 0) return
       service.post("/script/detail").then(resp =>{
-        console.log(resp,"11111111")
+        this.anchorData = [];
         resp.forEach(item => {
           this.anchorData.push({"text":item.text})
         });

@@ -10,6 +10,9 @@ export function fetchScript(name) {
 export function saveScript(name, data) {
   return service.post("/script", { name, data });
 }
+export function APIGetHostSelect() {
+  return service.get("/hosts");
+}
 export function deleteScript(name) {
   return service.delete(`/script?name=${encodeURIComponent(name)}`);
 }
