@@ -80,10 +80,8 @@ class DeployController extends Controller {
 
     try {
       // 读取文件目录
-      const files = await fs.readdir(req.context.fileDir);
-      console.log("filename : {}",files)
+      const files = await readdir(req.context.fileDir);
       const filesWithMemo = await Promise.all(files.map(async file => {
-        console.log("filename : {}",file   , "     ",file.filename())
         const fileMemos = await fileMemo.findOne({ fileName: file }).sort({ uploadTime: -1 });
         const fileWithMemo = fileMemos ? `${file}||${fileMemos.memo}` : file;
         return { file: fileWithMemo };
@@ -152,20 +150,20 @@ class DeployController extends Controller {
     }
 
     // 删除老的三个文件
-    const files = await fs.promises.readdir(req.context.fileDir);
-    console.log('删除老的三个文件' + files);
-    const sortedFiles = files.map(file => {
-      const filePath = path.resolve(req.context.fileDir, file);
-      return {
-        file,
-        time: fs.statSync(filePath).mtime.getTime(),
-      };
-    }).sort((a, b) => b.time - a.time);
-    const filesToDelete = sortedFiles.slice(3).map(f => f.file);
-    for (const file of filesToDelete) {
-      await fs.promises.unlink(path.resolve(req.context.fileDir, file));
-      fileMemo.deleteOne({ fileName: file });
-    }
+    // const files = await fs.promises.readdir(req.context.fileDir);
+    // console.log('删除老的三个文件' + files);
+    // const sortedFiles = files.map(file => {
+    //   const filePath = path.resolve(req.context.fileDir, file);
+    //   return {
+    //     file,
+    //     time: fs.statSync(filePath).mtime.getTime(),
+    //   };
+    // }).sort((a, b) => b.time - a.time);
+    // const filesToDelete = sortedFiles.slice(3).map(f => f.file);
+    // for (const file of filesToDelete) {
+    //   await fs.promises.unlink(path.resolve(req.context.fileDir, file));
+    //   fileMemo.deleteOne({ fileName: file });
+    // }
     ctx.body = { data: 'success' };
   }
 
