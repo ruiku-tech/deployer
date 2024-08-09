@@ -3,13 +3,13 @@ const path = require("path");
 const { exec } = require("child_process");
 const axios = require("axios").default;
 
-const url = `https://github.com/ruiku-tech/deployer/releases/latest`;
+const url = "https://api.github.com/repos/ruiku-tech/deployer/releases/latest";
 
 const localPath = "/usr/release.zip";
 const outputDir = "/usr/egg-server";
 
 /**2025.08.09 */
-const token = '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'
+const token = process.env.GHTOKEN
 
 axios
   .get(url, {

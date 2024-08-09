@@ -14,7 +14,7 @@ yum install -y unzip
 curl -sL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo yum install -y nodejs
 
-TOKEN="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"
+TOKEN=$GHTOKEN
 
 LATEST_RELEASE_INFO=$(curl -H "Authorization: token $TOKEN" -s "https://api.github.com/repos/ruiku-tech/deployer/releases/latest")
 
