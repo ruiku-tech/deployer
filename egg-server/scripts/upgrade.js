@@ -24,7 +24,7 @@ axios
         ? resp.data.assets[0].browser_download_url
         : null;
     if (downloadUrl) {
-      exec(`sudo wget --header="Authorization: token ${token}" -O ${localPath} ${downloadUrl}`, (error) => {
+      exec(`sudo wget -O ${localPath} ${downloadUrl}`, (error) => {
         if (error) {
           console.log("下载发布文件失败", error);
           return;
