@@ -81,13 +81,7 @@ class DeployController extends Controller {
     try {
       // 读取文件目录
       const files = await readdir(req.context.fileDir);
-      const filesWithMemo = await Promise.all(files.map(async file => {
-        const fileMemos = await fileMemo.findOne({ fileName: file }).sort({ uploadTime: -1 });
-        const fileWithMemo = fileMemos ? `${file}||${fileMemos.memo}` : file;
-        return { file: fileWithMemo };
-      }));
-
-      ctx.body = { data: filesWithMemo };
+      ctx.body = { data: files.map((file) => ({ file })) };
     } catch (err) {
       ctx.body = { err: err.message };
     }
@@ -98,19 +92,19 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     try {
       const files = await readdir(req.context.fileDir);
-      console.log("filename : {}",files)
       const stats = await Promise.all(
-        files.map(file =>
+        files.map((file) =>
           this.queryFileStat(path.resolve(req.context.fileDir, file))
         )
       );
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileMemos = await fileMemo.findOne({ fileName: file }).sort({ uploadTime: -1 });
+        const fileMemos = await fileMemo
+          .findOne({ fileName: file })
+          .sort({ uploadTime: -1 });
         if (fileMemos) {
           files[i] = `${file}||${fileMemos.memo}`;
         }
-        console.log("filenamesssssss:{}", fileMemos);
       }
       ctx.body = {
         data: files.map((file, index) => ({ file, size: stats[index] })),
@@ -128,7 +122,6 @@ class DeployController extends Controller {
     const memo = memos ? decodeURIComponent(escape(atob(memos))) : '';
 
     const time = dayjs().format('YYYYMMDD-HH:mm:ss');
-    console.log('文件名称：「」，memo：「」。', stream.filename, memo);
     const baseName = `${time}~${path.basename(stream.filename)}`;
     const fileName = memo ? `${baseName}` : baseName;
     // const fileName = memo ? `${baseName}||${memo}` : baseName;
@@ -141,7 +134,6 @@ class DeployController extends Controller {
     // 使用 pump 将文件流传输到写流
     await pump(stream, writeStream);
     try {
-
       const fileDocument = new fileMemo({ fileName, memo });
       await fileDocument.save();
     } catch (err) {
@@ -167,7 +159,7 @@ class DeployController extends Controller {
     ctx.body = { data: 'success' };
   }
 
-  async fileClone (ctx) {
+  async fileClone(ctx) {
     const { request: req, response: res } = ctx;
     const fileName = req.body.filename;
     const targetEnv = req.body.targetEnv;
@@ -183,17 +175,15 @@ class DeployController extends Controller {
       return;
     }
 
-    console.log("req", req.body, "currEnv:{}", req.headers.env);
+    console.log('req', req.body, 'currEnv:{}', req.headers.env);
     const basePath = path.resolve(__dirname, '../../workspace');
     const currentFilePath = path.resolve(basePath, env, 'files', fileName);
     const targetFilePath = path.resolve(basePath, targetEnv, 'files', fileName);
-    console.log("当前文件夹: ", currentFilePath);
-    console.log("目标文件夹: ", targetFilePath);
 
     try {
       await fs.promises.access(currentFilePath, fs.constants.F_OK);
     } catch (err) {
-      console.error("Error: Source file does not exist.", err);
+      console.error('Error: Source file does not exist.', err);
       ctx.status = 404;
       ctx.body = { message: 'Source file does not exist' };
       return;
@@ -204,7 +194,7 @@ class DeployController extends Controller {
     try {
       await fs.promises.mkdir(targetDir, { recursive: true });
     } catch (err) {
-      console.error("Error creating target directory:", err);
+      console.error('Error creating target directory:', err);
       ctx.status = 500;
       ctx.body = { message: 'Error creating target directory' };
       return;
@@ -215,7 +205,7 @@ class DeployController extends Controller {
       await fs.promises.copyFile(currentFilePath, targetFilePath);
       ctx.body = { data: 'success' };
     } catch (err) {
-      console.error("Error copying file:", err);
+      console.error('Error copying file:', err);
       ctx.status = 500;
       ctx.body = { message: 'Error copying file' };
     }
@@ -273,7 +263,7 @@ class DeployController extends Controller {
 
     try {
       const files = await readdir(context.configDir);
-      ctx.body = { data: files.map(name => ({ name })) };
+      ctx.body = { data: files.map((name) => ({ name })) };
     } catch (err) {
       ctx.body = { err };
     }
@@ -328,7 +318,7 @@ class DeployController extends Controller {
 
     try {
       const files = await readdir(context.scriptDir);
-      ctx.body = { data: files.map(name => ({ name })) };
+      ctx.body = { data: files.map((name) => ({ name })) };
     } catch (err) {
       ctx.body = { err };
     }
@@ -382,7 +372,7 @@ class DeployController extends Controller {
 
     try {
       const files = await readdir(req.context.batDir);
-      ctx.body = { data: files.map(name => ({ name })) };
+      ctx.body = { data: files.map((name) => ({ name })) };
     } catch (err) {
       ctx.body = { err };
     }
@@ -500,20 +490,20 @@ class DeployController extends Controller {
       req.context
     );
     list = ctx.service.executer.parse(env, context, list);
-    const parseErrs = list.filter(item => item.err);
+    const parseErrs = list.filter((item) => item.err);
     if (parseErrs.length) {
       return (ctx.body = {
-        err: parseErrs.map(item => item.err).join(','),
+        err: parseErrs.map((item) => item.err).join(','),
       });
     }
     // 记录部署记录
     // fs.writeFile(
     //   path.resolve(
     //     req.context.deployDir,
-    //     `${dayjs().format("YYYYMMDD-HH:mm:ss")}.txt`
+    //     `${dayjs().format('YYYYMMDD-HH:mm:ss')}.txt`
     //   ),
     //   JSON.stringify(list, null, 2),
-    //   "utf-8",
+    //   'utf-8',
     //   () => {}
     // );
     const user = await ctx.model.Record.create(recordList);
@@ -524,7 +514,7 @@ class DeployController extends Controller {
       ctx.body = { err };
     }
   }
-  async scriptDetail(ctx){
+  async scriptDetail(ctx) {
     const { request: req, response: res } = ctx;
     const page = req.body.page;
     const limit = req.body.limit;
@@ -535,10 +525,11 @@ class DeployController extends Controller {
     // 计算跳过的文档数量
     const skip = (pageNumber - 1) * pageSize;
     // 查询文档并按时间倒序排序，进行分页
-    const scripts = await scriptRecord.find()
-        .sort({ uploadTime: -1 }) // 按 uploadTime 倒序排序
-        .skip(skip)
-        .limit(pageSize);
+    const scripts = await scriptRecord
+      .find()
+      .sort({ uploadTime: -1 }) // 按 uploadTime 倒序排序
+      .skip(skip)
+      .limit(pageSize);
 
     // 获取总文档数量，用于计算总页数
     // const totalDocuments = await fileDocument.countDocuments();
@@ -553,7 +544,7 @@ class DeployController extends Controller {
       return (ctx.body = { err: `找不到服务器:${req.body.server}` });
     }
     const text = req.body.cmd;
-    if(req.body.cache){
+    if (req.body.cache) {
       const fileDocument = new scriptRecord({ text });
       fileDocument.save();
     }
@@ -562,7 +553,7 @@ class DeployController extends Controller {
       .then(() => {
         ctx.body = { data: 'success' };
       })
-      .catch(err => {
+      .catch((err) => {
         ctx.body = { err };
       });
   }
@@ -594,7 +585,7 @@ class DeployController extends Controller {
       .then(() => {
         ctx.body = { data: 'sccess' };
       })
-      .catch(err => {
+      .catch((err) => {
         ctx.body = { err };
       });
   }
