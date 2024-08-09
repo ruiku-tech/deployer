@@ -8,17 +8,25 @@ const url = `https://github.com/ruiku-tech/deployer/releases/latest`;
 const localPath = "/usr/release.zip";
 const outputDir = "/usr/egg-server";
 
+/**2025.08.09 */
+const token = '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'
+
 axios
-  .get(url)
+  .get(url, {
+    headers: {
+      Authorization:
+        `token ${token}`,
+    },
+  })
   .then((resp) => {
     const downloadUrl =
       resp.data.assets.length > 0
         ? resp.data.assets[0].browser_download_url
         : null;
     if (downloadUrl) {
-      exec(`sudo wget -O ${localPath} ${downloadUrl}`, (error) => {
+      exec(`sudo wget --header="Authorization: token ${token}" -O ${localPath} ${downloadUrl}`, (error) => {
         if (error) {
-          console.log('下载发布文件失败', error);
+          console.log("下载发布文件失败", error);
           return;
         }
         const command = `unzip -o ${localPath} -d ${outputDir}`;

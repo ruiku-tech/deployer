@@ -14,7 +14,13 @@ apt install -y unzip
 curl -sL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-wget -O /usr/release.zip https://github.com/ruiku-tech/deployer/releases/latest
+TOKEN="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"
+
+LATEST_RELEASE_INFO=$(curl -H "Authorization: token $TOKEN" -s "https://api.github.com/repos/ruiku-tech/deployer/releases/latest")
+
+DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | grep "browser_download_url" | grep "release.zip" | head -n 1 | cut -d '"' -f 4)
+
+wget --header="Authorization: token $TOKEN" -O /usr/release.zip "$DOWNLOAD_URL"
 
 mkdir /usr/egg-server
 unzip -o /usr/release.zip -d /usr/egg-server
