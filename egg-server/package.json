@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "acme-client": "^5.3.0",
+    "archiver": "^7.0.1",
     "axios": "^1.6.8",
     "cors": "^2.8.5",
     "dayjs": "^1.11.10",
@@ -42,7 +43,9 @@
     "test:local": "egg-bin test",
     "cov": "egg-bin cov",
     "lint": "eslint .",
-    "ci": "npm run lint && npm run cov"
+    "ci": "npm run lint && npm run cov",
+    "pack": "node scripts/pack.js",
+    "upgrade": "node scripts/upgrade.js"
   },
   "repository": {
     "type": "git",
