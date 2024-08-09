@@ -1,7 +1,7 @@
-const fs = require("fs");
-const config = require("./config");
-const path = require("path");
-const { exec } = require("child_process");
+const fs = require('fs');
+const config = require('./config');
+const path = require('path');
+const { exec } = require('child_process');
 
 function create(env) {
   const context = config.createContext(env);
@@ -11,13 +11,13 @@ function create(env) {
   }
 
   if (!fs.existsSync(context.varsFile)) {
-    fs.writeFileSync(context.varsFile, "", "utf-8");
+    fs.writeFileSync(context.varsFile, '', 'utf-8');
   }
   if (!fs.existsSync(context.fileDir)) {
     fs.mkdirSync(context.fileDir);
   }
   if (!fs.existsSync(context.hostsFile)) {
-    fs.writeFileSync(context.hostsFile, "", "utf-8");
+    fs.writeFileSync(context.hostsFile, '', 'utf-8');
   }
   if (!fs.existsSync(context.configDir)) {
     fs.mkdirSync(context.configDir);
@@ -57,7 +57,7 @@ function copy(env, src) {
     );
   });
 }
-function destory(env){
+function destory(env) {
   const context = config.createContext(env);
   return new Promise((resolve, reject) => {
     exec(
@@ -80,5 +80,5 @@ function destory(env){
 module.exports = {
   create,
   copy,
-  destory
+  destory,
 };

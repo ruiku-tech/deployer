@@ -26,8 +26,11 @@
           />
         </el-form-item>
         <el-form-item>
+
           <el-button type="primary" @click="commit()">执行</el-button>
           <el-button @click="reset()">重置</el-button>
+          <el-button @click="showHistoryScript()">历史记录</el-button>
+          <el-checkbox v-model="checked" style="margin-left: 20px">保留本次脚本记录</el-checkbox>
         </el-form-item>
       </el-form>
     </div>
@@ -80,12 +83,19 @@
       <el-button type="primary" @click="logOut()">退出</el-button>
     </div>
   </div>
+  <el-drawer v-model="drawer" title="历史记录" :with-header="true" direction="rtl">
+    <el-table :data="anchorData" style="width: 100%" @cell-click="clickText">
+      <el-table-column prop="text" label="脚本内容">
+      </el-table-column>
+    </el-table>
+  </el-drawer>
 </template>
 
 <script>
 import { ElMessage } from "element-plus";
-import { fetchHosts, run, deploySSL, apiAuto } from "../api";
+import {fetchHosts, run, deploySSL, apiAuto, APIGetHistoryScript} from "../api";
 import dataCenter from "../dataCenter";
+import service from "@/api/base";
 export default {
   name: "executer",
   data() {
@@ -105,13 +115,31 @@ export default {
         port: "",
         prefix: "",
       },
+      checked: false,
+      drawer : false,
+      anchorData: [],
     };
   },
   mounted() {
     this.reload();
     this.fresh();
+    this.anchorData = [];
   },
   methods: {
+    clickText(row, column, cell, event){
+      this.drawer = false;
+      this.form.data = row.text
+    },
+    showHistoryScript(){
+      this.drawer = true
+      if(this.anchorData.length > 0) return
+      service.post("/script/detail").then(resp =>{
+        this.anchorData = [];
+        resp.forEach(item => {
+          this.anchorData.push({"text":item.text})
+        });
+      })
+    },
     reload() {
       fetchHosts().then((data) => {
         this.hosts = Object.keys(data);
@@ -135,7 +163,7 @@ export default {
       if (!this.form.data) {
         return ElMessage.error("请输入脚本");
       }
-      run(this.form.host, this.form.data);
+      run(this.form.host, this.form.data,this.checked);
     },
     reset() {
       this.$refs.formRef.resetFields();

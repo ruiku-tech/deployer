@@ -1,4 +1,4 @@
-const broadcast = require("../../service/broadcast");
+const broadcast = require('../../service/broadcast');
 
 class GirdNine {
   constructor(owner) {
@@ -16,13 +16,13 @@ class GirdNine {
   async queryUserCount() {
     try {
       const data = await this.owner.get(
-        "查询用户次数",
-        "/v1/popularize/queryUserCount"
+        '查询用户次数',
+        '/v1/popularize/queryUserCount'
       );
       if (!data.data.curtAmount) {
-        broadcast.cast(`ERR:curtAmount(已有金额)字段缺失`);
+        broadcast.cast('ERR:curtAmount(已有金额)字段缺失');
       } else if (!data.data.count) {
-        broadcast.cast(`ERR:count缺失`);
+        broadcast.cast('ERR:count缺失');
       } else {
         broadcast.cast(
           `:查询用户次数验证通过\n金额${data.data.curtAmount},可玩次数${data.data.count}`
@@ -36,13 +36,13 @@ class GirdNine {
   async popularizes() {
     try {
       const data = await this.owner.get(
-        "玩九宫格",
-        "/v1/popularize/popularizes"
+        '玩九宫格',
+        '/v1/popularize/popularizes'
       );
       if (!data.data.addAmount) {
-        broadcast.cast(`ERR:addAmount字段缺失`);
+        broadcast.cast('ERR:addAmount字段缺失');
       } else if (!data.data.count) {
-        broadcast.cast(`ERR:count缺失`);
+        broadcast.cast('ERR:count缺失');
       } else {
         broadcast.cast(
           `:玩九宫格验证通过\n增加金额${data.data.addAmount},可玩次数${data.data.count}`
@@ -57,17 +57,17 @@ class GirdNine {
   async getUserInviteUser() {
     try {
       const data = await this.owner.get(
-        "查询记录",
-        "/v1/popularize/getUserInviteUser"
+        '查询记录',
+        '/v1/popularize/getUserInviteUser'
       );
-      const addAmount = data.data.every((item) => "addAmount" in item);
-      const username = data.data.every((item) => "username" in item);
+      const addAmount = data.data.every(item => 'addAmount' in item);
+      const username = data.data.every(item => 'username' in item);
       if (!addAmount) {
-        broadcast.cast(`ERR:addAmount字段缺失`);
+        broadcast.cast('ERR:addAmount字段缺失');
       } else if (!username) {
-        broadcast.cast(`ERR:username字段缺失`);
+        broadcast.cast('ERR:username字段缺失');
       } else {
-        broadcast.cast(`:查询记录验证通过`);
+        broadcast.cast(':查询记录验证通过');
       }
     } catch (error) {
       broadcast.cast(`:查询记录失败\n${JSON.stringify(error)}`);
@@ -77,13 +77,13 @@ class GirdNine {
   async receiveReward() {
     try {
       const data = await this.owner.get(
-        "领取奖励",
-        "/v1/popularize/receiveReward"
+        '领取奖励',
+        '/v1/popularize/receiveReward'
       );
       broadcast.cast(`:领取奖励验证通过\n${JSON.stringify(data)}`);
     } catch (error) {
       if (error.data.code == 2022) {
-        broadcast.cast(`:未满足条件`);
+        broadcast.cast(':未满足条件');
       } else {
         broadcast.cast(`:领取奖励失败\n${JSON.stringify(error)}`);
       }

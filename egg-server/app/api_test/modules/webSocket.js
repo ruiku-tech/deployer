@@ -1,28 +1,28 @@
-const WebSocket = require("ws");
-const broadcast = require("../../service/broadcast");
+const WebSocket = require('ws');
+const broadcast = require('../../service/broadcast');
 const ConnModal = {
   PING: -1,
   /** client to server 请求聊天记录*/
   C2S_CHAT_HISTORY: 0,
-  /**server to client 聊天记录响应 */
+  /** server to client 聊天记录响应 */
   S2C_CHAT_HISTORY: 1,
 
   /** 新的聊天信息 */
   C2S_NEW_CHAT: 2,
-  /**新的聊天信息 */
+  /** 新的聊天信息 */
   S2C_NEW_CHAT: 3,
 
   /** 聊天信息广播*/
   S2C_CHAT_BROADCAST: 4,
-  /**中奖消息世界通告 */
+  /** 中奖消息世界通告 */
   S2C_WORLD_PRIZE_BROADCAST: 5,
-  /**新的站内消息 */
+  /** 新的站内消息 */
   S2C_MEW_MSG: 6,
-  /**金钱变更 */
+  /** 金钱变更 */
   S2C_MONEY_CHANGE: 7,
-  /**等级 */
+  /** 等级 */
   S2C_EXPERIENCE: 8,
-  /**玩三方游戏的通知 */
+  /** 玩三方游戏的通知 */
   S2C_THIRD_PLAY: 9,
 };
 class WS {
@@ -35,21 +35,21 @@ class WS {
     this.socket();
   }
   socket() {
-    const socketUrl = `ws://43.133.227.48/api/socket/${this.owner.data["freshToken"]}`;
+    const socketUrl = `ws://43.133.227.48/api/socket/${this.owner.data.freshToken}`;
     const socket = new WebSocket(socketUrl);
 
-    socket.onopen = function (event) {
+    socket.onopen = function(event) {
       const message = {
         model: 2,
-        data: { type: 0, content: "群聊发消息自动化测试" },
+        data: { type: 0, content: '群聊发消息自动化测试' },
         id: 4,
       };
       socket.send(JSON.stringify(message));
-      console.log("已连接ws");
+      console.log('已连接ws');
     };
 
-    socket.onmessage = function (event) {
-      let onmessage = JSON.parse(event.data);
+    socket.onmessage = function(event) {
+      const onmessage = JSON.parse(event.data);
       switch (parseInt(onmessage.model)) {
         case ConnModal.PING:
           break;
@@ -80,8 +80,8 @@ class WS {
       }
     };
 
-    socket.onclose = function (event) {
-      console.log("连接已关闭");
+    socket.onclose = function(event) {
+      console.log('连接已关闭');
     };
   }
 }

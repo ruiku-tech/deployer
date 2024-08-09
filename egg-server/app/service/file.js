@@ -1,9 +1,9 @@
-const { Service } = require("egg");
+const { Service } = require('egg');
 class FileService extends Service {
   async readFileContent(filePath) {
     try {
-      const data = await fs.readFile(filePath, "utf-8");
-      return { data: data };
+      const data = await fs.readFile(filePath, 'utf-8');
+      return { data };
     } catch (error) {
       return { error };
     }

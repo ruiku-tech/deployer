@@ -46,11 +46,12 @@
       </el-table>
     </el-card>
   </div>
+
 </template>
 
 <script>
 import { ElMessage } from "element-plus";
-import { deleteScript, fetchScript, fetchScripts, saveScript } from "../api";
+import {APIGetHostSelect, deleteScript, fetchScript, fetchScripts, saveScript} from "../api";
 import { confirmDelete } from "../utils";
 
 export default {
@@ -62,7 +63,7 @@ export default {
         name: "",
         data: "",
       },
-      collapse:[]
+      collapse:[],
     };
   },
   mounted() {

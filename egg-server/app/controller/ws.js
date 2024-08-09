@@ -1,6 +1,6 @@
 // app/controller/ws.js
-const Controller = require("egg").Controller;
-const broadcast = require("../service/broadcast");
+const Controller = require('egg').Controller;
+const broadcast = require('../service/broadcast');
 class WSController extends Controller {
   async connect() {
     const { ctx, app } = this;
