@@ -59,13 +59,14 @@ async function requestCertificate(server, domain, ctx1) {
   try {
     const cert = await client.auto({
       csr,
-      email: 'cqxx1990@outlook.com',
+      email: 'shipotian1990@outlook.com',
       termsOfServiceAgreed: true,
       challengePriority: [ 'http-01' ],
       challengeCreateFn,
     });
   } catch (error) {
     console.log(error, '什么问题');
+    return Promise.reject(error.message);
   }
   // 保存证书和密钥
   fs.writeFileSync(certPath, cert, 'utf-8');
