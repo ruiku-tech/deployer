@@ -16,3 +16,7 @@ export function APIGetHostSelect() {
 export function deleteScript(name) {
   return service.delete(`/script?name=${encodeURIComponent(name)}`);
 }
+
+export function APIRunScript(host, cmd) {
+  return service.post("/script/run", { host, cmd });
+}

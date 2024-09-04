@@ -52,6 +52,7 @@ module.exports = app => {
   router.post('/deploy/script', deployMiddle, controller.deploy.postScript);
   // 删除脚本
   router.delete('/deploy/script', deployMiddle, controller.deploy.deleteScript);
+  router.post('/deploy/script/run', deployMiddle, controller.deploy.scriptRun);
 
   // 获取编排列表
   router.get('/deploy/bats', deployMiddle, controller.deploy.getBats);
