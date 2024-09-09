@@ -124,9 +124,9 @@
             <el-button link type="primary" size="small" @click="del(scope.row)"
               >删除</el-button
             >
-            <el-button link type="primary" size="small" @click="runTo(scope.row)"
-            >运行到</el-button
-            >
+<!--            <el-button link type="primary" size="small" @click="runTo(scope.row)"-->
+<!--            >运行到</el-button-->
+<!--            >-->
           </template>
         </el-table-column>
       </el-table>
@@ -171,7 +171,7 @@ import {
   fetchScripts,
   saveBat,
   saveBatItem,
-  deleteBatItem, APIGetHostSelect,
+  deleteBatItem, APIGetHostSelect, APIRunScript,
 } from "../api";
 import DeployConfirm from "./DeployConfirm.vue";
 import { confirmDelete } from "../utils";

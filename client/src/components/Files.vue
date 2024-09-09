@@ -168,9 +168,11 @@ export default {
       }
     },
     delFile(item) {
-      confirmDelete().then(() => {
+      confirmDelete().then((res) => {
         deleteFile(item.file).then(() => {
           setTimeout(this.fresh, 1000);
+        }).catch(err =>{
+          console.error("删除文件时出错:", err.message || JSON.stringify(err));
         });
       });
     },

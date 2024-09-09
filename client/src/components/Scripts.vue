@@ -33,7 +33,7 @@
       </template>
       <el-table :data="list" style="width: 100%">
         <el-table-column prop="name" label="脚本名字" />
-        <el-table-column label="操作" width="120">
+        <el-table-column label="操作" width="160">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="edit(scope.row)"
               >修改</el-button
@@ -41,17 +41,42 @@
             <el-button link type="primary" size="small" @click="del(scope.row)"
               >删除</el-button
             >
+            <el-button link type="primary" size="small" @click="runTo(scope.row)"
+            >运行到</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
     </el-card>
   </div>
 
+  <el-dialog v-model="dialogFormVisible" title="服务器列表" width="500">
+    <el-form :model="form">
+      <el-form-item label="服务器列表" :label-width="formLabelWidth">
+        <el-select v-model="select" placeholder="选择服务器">
+          <el-option
+              v-for="(label, value) in serverOptions"
+              :key="value"
+              :label="label"
+              :value="value"
+          />
+        </el-select>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="dialogFormVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmRunScript()">
+          确认
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <script>
 import { ElMessage } from "element-plus";
-import {APIGetHostSelect, deleteScript, fetchScript, fetchScripts, saveScript} from "../api";
+import {APIGetHostSelect, APIRunScript, deleteScript, fetchScript, fetchScripts, saveScript} from "../api";
 import { confirmDelete } from "../utils";
 
 export default {
@@ -64,6 +89,10 @@ export default {
         data: "",
       },
       collapse:[],
+      dialogFormVisible:false,
+      serverOptions: {},
+      select:"",
+      currentScript:"",
     };
   },
   mounted() {
@@ -100,6 +129,29 @@ export default {
     },
     reset() {
       this.$refs.formRef.resetFields();
+    },
+    runTo(row){
+      console.log("ssssss",row.name)
+      this.currentScript = row.name
+      this.dialogFormVisible = true
+      APIGetHostSelect()
+          .then((resp) => {
+            this.serverOptions = resp;
+          })
+          .catch((error) => {
+            console.error('Failed to get host select:', error);
+            ElMessage.error('获取服务器选项失败');
+          });
+    },
+    confirmRunScript(){
+      this.dialogFormVisible = false
+      console.log("select", this.select)
+      APIRunScript(this.select, this.currentScript).then(resp =>{
+
+      }).catch((error) => {
+        console.error('Failed to get host select:', error);
+        ElMessage.error('执行失败，稍后再试');
+      })
     },
   },
 };

@@ -663,5 +663,73 @@ class DeployController extends Controller {
       ctx.body = { err: { code: '删除失败' } };
     }
   }
+  // 运行脚本到指定服务器
+  async scriptRun(ctx) {
+    const { request: req, response: res } = ctx;
+    const targetHost = req.body.host;
+    const targetScriptName = req.body.cmd;
+    const env = req.headers.env;
+    console.log("服务器名称：",targetHost, "脚本名称：",targetScriptName,"env:",env);
+    // try {
+    //   const hostsFilePath = path.resolve(req.context.hostsFile);
+    //   const hostsData = await readFile(hostsFilePath, 'utf-8');
+    //   console.log("服务器列表文件配置：", hostsData);
+    // } catch (err) {
+    //   console.error("读取服务器列表文件失败：", err);
+    // }
+    //
+    // try {
+    //   const scriptFilePath = path.resolve(req.context.scriptDir, targetScriptName);
+    //   const scriptData = await readFile(scriptFilePath, 'utf-8');
+    //   console.log("脚本文件内容：", scriptData);
+    // } catch (err) {
+    //   console.error("读取脚本文件失败：", err);
+    // }
+
+    let serverConfig = '';
+    try {
+      const hostsFilePath = path.resolve(req.context.hostsFile);
+      const hostsData = await readFile(hostsFilePath, 'utf-8');
+      const hostsJson = JSON.parse(hostsData);
+      serverConfig = hostsJson[targetHost];
+      if (!serverConfig) {
+        ctx.body = { err: `未找到服务器配置: ${targetHost}` };
+        return;
+      }
+    } catch (err) {
+      console.error("读取服务器列表文件失败：", err);
+      ctx.body = { err: "服务器配置读取失败" };
+      return;
+    }
+    const [host, password] = serverConfig.split(':');
+    // 读取脚本文件的内容
+    let scriptData;
+    try {
+      const scriptFilePath = path.resolve(req.context.scriptDir, targetScriptName);
+      scriptData = await readFile(scriptFilePath, 'utf-8');
+    } catch (err) {
+      console.error("读取脚本文件失败：", err);
+      ctx.body = { err: "脚本读取失败" };
+      return;
+    }
+
+    // 构造服务器对象
+    const server = {
+      host: host,
+      password: password,
+    };
+    const finalScript = utils.parseVars.call(scriptData);
+
+    // 调用封装好的执行方法
+    try {
+      await ctx.service.executer.run(server, finalScript);
+      ctx.body = { data: 'success' };
+    } catch (err) {
+      console.error("脚本执行失败：", err);
+      ctx.body = { err: "脚本执行失败" };
+    }
+
+    ctx.body = { data: 'sccess' };
+  }
 }
 module.exports = DeployController;
