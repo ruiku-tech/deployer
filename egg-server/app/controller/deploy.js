@@ -97,17 +97,20 @@ class DeployController extends Controller {
           this.queryFileStat(path.resolve(req.context.fileDir, file))
         )
       );
+      const memos = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileMemos = await fileMemo
           .findOne({ fileName: file })
           .sort({ uploadTime: -1 });
         if (fileMemos) {
-          files[i] = `${file}||${fileMemos.memo}`;
+          memos[i] = fileMemos.memo;
+        } else {
+          memos[i] = '';
         }
       }
       ctx.body = {
-        data: files.map((file, index) => ({ file, size: stats[index] })),
+        data: files.map((file, index) => ({ file, size: stats[index], memo: memos[index] })),
       };
     } catch (err) {
       ctx.body = { err };
@@ -516,26 +519,22 @@ class DeployController extends Controller {
   }
   async scriptDetail(ctx) {
     const { request: req, response: res } = ctx;
-    const page = req.body.page;
-    const limit = req.body.limit;
-    // 将 page 和 limit 转换为整数
-    const pageNumber = parseInt(page, 10) || 1; // 默认第一页
-    const pageSize = parseInt(limit, 10) || 10; // 默认每页 10 条
-
-    // 计算跳过的文档数量
-    const skip = (pageNumber - 1) * pageSize;
     // 查询文档并按时间倒序排序，进行分页
     const scripts = await scriptRecord
       .find()
-      .sort({ uploadTime: -1 }) // 按 uploadTime 倒序排序
-      .skip(skip)
-      .limit(pageSize);
+      .sort({ uploadTime: -1 }); // 按 uploadTime 倒序排序
 
     // 获取总文档数量，用于计算总页数
     // const totalDocuments = await fileDocument.countDocuments();
     // const totalPages = Math.ceil(totalDocuments / pageSize);
     ctx.body = { data: scripts };
   }
+  async scriptDelete(ctx) {
+    const { request: req, response: res } = ctx;
+    await scriptRecord.deleteOne({ text: req.body.text });
+    ctx.body = { data: 'success' };
+  }
+  
   async postRun(ctx) {
     const { request: req, response: res } = ctx;
     const hosts = utils.parseHosts.call(req.context);
@@ -546,7 +545,7 @@ class DeployController extends Controller {
     const text = req.body.cmd;
     if (req.body.cache) {
       const fileDocument = new scriptRecord({ text });
-      fileDocument.save();
+      fileDocument.save().catch(() => {});
     }
     await ctx.service.executer
       .run(server, req.body.cmd)

@@ -77,6 +77,7 @@ module.exports = app => {
   router.post('/deploy/deploy', deployMiddle, controller.deploy.postDeploy);
   router.post('/deploy/run', deployMiddle, controller.deploy.postRun);
   router.post('/deploy/script/detail', deployMiddle, controller.deploy.scriptDetail);
+  router.post('/deploy/script/delete', deployMiddle, controller.deploy.scriptDelete);
 
   // 获取正在部署的
   router.get('/deploy/deployings', controller.deploy.getDeployings);
