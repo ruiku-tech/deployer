@@ -1,16 +1,16 @@
-const { Controller } = require('egg');
-const dayjs = require('dayjs');
-const cert = require('../service/cert');
-const utils = require('../service/utils');
-const multer = require('multer');
-const { log, error } = require('console');
-const { isObjectEqual } = require('../service/record');
-const fs = require('fs');
-const path = require('path');
-const config = require('../service/config');
-const pump = require('mz-modules/pump');
-const fileMemo = require('../model/FileMemo');
-const scriptRecord = require('../model/ScriptRecord');
+const { Controller } = require("egg");
+const dayjs = require("dayjs");
+const cert = require("../service/cert");
+const utils = require("../service/utils");
+const multer = require("multer");
+const { log, error } = require("console");
+const { isObjectEqual } = require("../service/record");
+const fs = require("fs");
+const path = require("path");
+const config = require("../service/config");
+const pump = require("mz-modules/pump");
+const fileMemo = require("../model/FileMemo");
+const scriptRecord = require("../model/ScriptRecord");
 
 const userFile = config.userFile();
 const storage = multer.diskStorage({
@@ -19,21 +19,21 @@ const storage = multer.diskStorage({
   },
   filename(req, file, cb) {
     const now = dayjs();
-    const time = now.format('YYYYMMDD-HH:mm:ss');
+    const time = now.format("YYYYMMDD-HH:mm:ss");
     cb(null, `${time}~${file.originalname}`); // 上传文件的文件名
   },
 });
 const upload = multer({
   storage,
 });
-const util = require('util');
+const util = require("util");
 
 const readFile = util.promisify(fs.readFile);
 const readdir = util.promisify(fs.readdir);
 const writeFile = util.promisify(fs.writeFile);
 const unlink = util.promisify(fs.unlink);
 // 初始化环境
-const workspaceDir = path.resolve(__dirname, '../../workspace');
+const workspaceDir = path.resolve(__dirname, "../../workspace");
 if (!fs.existsSync(workspaceDir)) {
   fs.mkdirSync(workspaceDir);
 }
@@ -52,7 +52,7 @@ class DeployController extends Controller {
   async getVars(ctx) {
     const { request: req, response: res } = ctx;
     try {
-      const data = await readFile(req.context.varsFile, 'utf-8');
+      const data = await readFile(req.context.varsFile, "utf-8");
       ctx.body = { data };
     } catch (err) {
       ctx.body = { err };
@@ -67,7 +67,7 @@ class DeployController extends Controller {
       const data = await writeFile(
         req.context.varsFile,
         req.body.data,
-        'utf-8'
+        "utf-8"
       );
       ctx.body = { data };
     } catch (err) {
@@ -106,11 +106,15 @@ class DeployController extends Controller {
         if (fileMemos) {
           memos[i] = fileMemos.memo;
         } else {
-          memos[i] = '';
+          memos[i] = "";
         }
       }
       ctx.body = {
-        data: files.map((file, index) => ({ file, size: stats[index], memo: memos[index] })),
+        data: files.map((file, index) => ({
+          file,
+          size: stats[index],
+          memo: memos[index],
+        })),
       };
     } catch (err) {
       ctx.body = { err };
@@ -122,9 +126,9 @@ class DeployController extends Controller {
     const stream = await ctx.getFileStream();
     const { request: req } = ctx;
     const memos = req.headers.memo;
-    const memo = memos ? decodeURIComponent(escape(atob(memos))) : '';
+    const memo = memos ? decodeURIComponent(escape(atob(memos))) : "";
 
-    const time = dayjs().format('YYYYMMDD-HH:mm:ss');
+    const time = dayjs().format("YYYYMMDD-HH:mm:ss");
     const baseName = `${time}~${path.basename(stream.filename)}`;
     const fileName = memo ? `${baseName}` : baseName;
     // const fileName = memo ? `${baseName}||${memo}` : baseName;
@@ -140,8 +144,8 @@ class DeployController extends Controller {
       const fileDocument = new fileMemo({ fileName, memo });
       await fileDocument.save();
     } catch (err) {
-      console.error('Error saving file to MongoDB:', err);
-      ctx.throw(500, 'Error saving file to MongoDB');
+      console.error("Error saving file to MongoDB:", err);
+      ctx.throw(500, "Error saving file to MongoDB");
     }
 
     // 删除老的三个文件
@@ -159,7 +163,7 @@ class DeployController extends Controller {
     //   await fs.promises.unlink(path.resolve(req.context.fileDir, file));
     //   fileMemo.deleteOne({ fileName: file });
     // }
-    ctx.body = { data: 'success' };
+    ctx.body = { data: "success" };
   }
 
   async fileClone(ctx) {
@@ -169,26 +173,26 @@ class DeployController extends Controller {
     const env = req.headers.env;
     if (!fileName || !targetEnv || !env) {
       ctx.status = 400;
-      ctx.body = { message: 'Missing required parameters' };
+      ctx.body = { message: "Missing required parameters" };
       return;
     }
 
     if (targetEnv === env) {
-      ctx.body = { data: 'success' };
+      ctx.body = { data: "success" };
       return;
     }
 
-    console.log('req', req.body, 'currEnv:{}', req.headers.env);
-    const basePath = path.resolve(__dirname, '../../workspace');
-    const currentFilePath = path.resolve(basePath, env, 'files', fileName);
-    const targetFilePath = path.resolve(basePath, targetEnv, 'files', fileName);
+    console.log("req", req.body, "currEnv:{}", req.headers.env);
+    const basePath = path.resolve(__dirname, "../../workspace");
+    const currentFilePath = path.resolve(basePath, env, "files", fileName);
+    const targetFilePath = path.resolve(basePath, targetEnv, "files", fileName);
 
     try {
       await fs.promises.access(currentFilePath, fs.constants.F_OK);
     } catch (err) {
-      console.error('Error: Source file does not exist.', err);
+      console.error("Error: Source file does not exist.", err);
       ctx.status = 404;
-      ctx.body = { message: 'Source file does not exist' };
+      ctx.body = { message: "Source file does not exist" };
       return;
     }
 
@@ -197,20 +201,20 @@ class DeployController extends Controller {
     try {
       await fs.promises.mkdir(targetDir, { recursive: true });
     } catch (err) {
-      console.error('Error creating target directory:', err);
+      console.error("Error creating target directory:", err);
       ctx.status = 500;
-      ctx.body = { message: 'Error creating target directory' };
+      ctx.body = { message: "Error creating target directory" };
       return;
     }
 
     // 复制文件
     try {
       await fs.promises.copyFile(currentFilePath, targetFilePath);
-      ctx.body = { data: 'success' };
+      ctx.body = { data: "success" };
     } catch (err) {
-      console.error('Error copying file:', err);
+      console.error("Error copying file:", err);
       ctx.status = 500;
-      ctx.body = { message: 'Error copying file' };
+      ctx.body = { message: "Error copying file" };
     }
   }
 
@@ -232,8 +236,8 @@ class DeployController extends Controller {
   async getHosts(ctx) {
     const { request: req, response: res } = ctx;
     try {
-      const data = await readFile(req.context.hostsFile, 'utf-8');
-      let jsonData = '';
+      const data = await readFile(req.context.hostsFile, "utf-8");
+      let jsonData = "";
       try {
         jsonData = JSON.parse(data);
       } catch (error) {}
@@ -251,9 +255,9 @@ class DeployController extends Controller {
       const data = await writeFile(
         req.context.hostsFile,
         JSON.stringify(req.body.data, null, 2),
-        'utf-8'
+        "utf-8"
       );
-      ctx.body = { data: 'success' };
+      ctx.body = { data: "success" };
     } catch (err) {
       ctx.body = { err };
     }
@@ -279,7 +283,7 @@ class DeployController extends Controller {
     const filePath = path.resolve(context.configDir, name);
 
     try {
-      const data = await readFile(filePath, 'utf-8');
+      const data = await readFile(filePath, "utf-8");
       ctx.body = { data };
     } catch (err) {
       ctx.body = { err };
@@ -293,7 +297,7 @@ class DeployController extends Controller {
     const filePath = path.resolve(context.configDir, name);
 
     try {
-      await writeFile(filePath, req.body.data, 'utf-8');
+      await writeFile(filePath, req.body.data, "utf-8");
       ctx.body = { success: true };
     } catch (err) {
       ctx.body = { err };
@@ -334,7 +338,7 @@ class DeployController extends Controller {
     const filePath = path.resolve(context.scriptDir, name);
 
     try {
-      const data = await readFile(filePath, 'utf-8');
+      const data = await readFile(filePath, "utf-8");
       ctx.body = { data };
     } catch (err) {
       ctx.body = { err };
@@ -348,7 +352,7 @@ class DeployController extends Controller {
     const filePath = path.resolve(context.scriptDir, name);
 
     try {
-      await writeFile(filePath, req.body.data, 'utf-8');
+      await writeFile(filePath, req.body.data, "utf-8");
       ctx.body = { success: true };
     } catch (err) {
       ctx.body = { err };
@@ -387,7 +391,7 @@ class DeployController extends Controller {
     const filePath = path.resolve(req.context.batDir, name);
 
     try {
-      const data = await readFile(filePath, 'utf-8');
+      const data = await readFile(filePath, "utf-8");
       ctx.body = {
         data: data ? JSON.parse(data) : `编排组合[${name}]未找到`,
       };
@@ -403,11 +407,11 @@ class DeployController extends Controller {
     const filePath = path.resolve(context.batDir, name);
     const exist = fs.existsSync(filePath);
     if (exist) {
-      return (ctx.body = { err: '编排已存在' });
+      return (ctx.body = { err: "编排已存在" });
     }
 
     try {
-      const data = await writeFile(filePath, '{}', 'utf-8');
+      const data = await writeFile(filePath, "{}", "utf-8");
       ctx.body = { data };
     } catch (err) {
       ctx.body = { err };
@@ -435,12 +439,12 @@ class DeployController extends Controller {
     const filePath = path.resolve(context.batDir, name);
 
     try {
-      const data = await readFile(filePath, 'utf-8');
+      const data = await readFile(filePath, "utf-8");
       const json = JSON.parse(data);
       const { name, ...rest } = req.body.data;
       json[name] = rest;
 
-      writeFile(filePath, JSON.stringify(json), 'utf-8');
+      writeFile(filePath, JSON.stringify(json), "utf-8");
       ctx.body = { success: true };
     } catch (err) {
       ctx.body = { err };
@@ -454,11 +458,11 @@ class DeployController extends Controller {
     const filePath = path.resolve(context.batDir, name);
 
     try {
-      const data = await readFile(filePath, 'utf-8');
+      const data = await readFile(filePath, "utf-8");
       const json = JSON.parse(data);
       delete json[req.query.item];
 
-      writeFile(filePath, JSON.stringify(json), 'utf-8');
+      writeFile(filePath, JSON.stringify(json), "utf-8");
       ctx.body = { success: true };
     } catch (err) {
       ctx.body = { err };
@@ -484,7 +488,7 @@ class DeployController extends Controller {
     const env = req.body.env;
     const recordList = list;
     if (!list || !list.length) {
-      return (ctx.body = { err: '请选择部署的脚本' });
+      return (ctx.body = { err: "请选择部署的脚本" });
     }
     const vars = utils.parseVars.call(req.context);
     const hosts = utils.parseHosts.call(req.context);
@@ -496,7 +500,7 @@ class DeployController extends Controller {
     const parseErrs = list.filter((item) => item.err);
     if (parseErrs.length) {
       return (ctx.body = {
-        err: parseErrs.map((item) => item.err).join(','),
+        err: parseErrs.map((item) => item.err).join(","),
       });
     }
     // 记录部署记录
@@ -520,9 +524,7 @@ class DeployController extends Controller {
   async scriptDetail(ctx) {
     const { request: req, response: res } = ctx;
     // 查询文档并按时间倒序排序，进行分页
-    const scripts = await scriptRecord
-      .find()
-      .sort({ uploadTime: -1 }); // 按 uploadTime 倒序排序
+    const scripts = await scriptRecord.find().sort({ uploadTime: -1 }); // 按 uploadTime 倒序排序
 
     // 获取总文档数量，用于计算总页数
     // const totalDocuments = await fileDocument.countDocuments();
@@ -532,9 +534,9 @@ class DeployController extends Controller {
   async scriptDelete(ctx) {
     const { request: req, response: res } = ctx;
     await scriptRecord.deleteOne({ text: req.body.text });
-    ctx.body = { data: 'success' };
+    ctx.body = { data: "success" };
   }
-  
+
   async postRun(ctx) {
     const { request: req, response: res } = ctx;
     const hosts = utils.parseHosts.call(req.context);
@@ -550,7 +552,7 @@ class DeployController extends Controller {
     await ctx.service.executer
       .run(server, req.body.cmd)
       .then(() => {
-        ctx.body = { data: 'success' };
+        ctx.body = { data: "success" };
       })
       .catch((err) => {
         ctx.body = { err };
@@ -567,7 +569,7 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     const host = req.query.host;
     ctx.service.executer.stopDeploy(host);
-    ctx.body = { data: 'sccess' };
+    ctx.body = { data: "sccess" };
   }
 
   // 申请证书
@@ -582,7 +584,7 @@ class DeployController extends Controller {
     await cert
       .requestCertificate(server, domain, ctx)
       .then(() => {
-        ctx.body = { data: 'sccess' };
+        ctx.body = { data: "sccess" };
       })
       .catch((err) => {
         ctx.body = { err };
@@ -593,13 +595,13 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     // apiAuto.init(req.query.host);
     try {
-      const ApiTester = require('../api_test/index');
+      const ApiTester = require("../api_test/index");
       global.isTest = false;
       new ApiTester({
         host: `${req.query.host}:${req.query.port}`,
         prefix: `${req.query.prefix}`,
       }).run();
-      ctx.body = { data: 'sccess' };
+      ctx.body = { data: "sccess" };
     } catch (error) {
       ctx.body = { error };
     }
@@ -612,14 +614,14 @@ class DeployController extends Controller {
       username: req.body.username,
     });
     if (jsonData.length > 0) {
-      return (ctx.body = { err: { code: '用户名已注册' } });
+      return (ctx.body = { err: { code: "用户名已注册" } });
     }
     try {
       await ctx.model.User.create({
         username: req.body.username,
         password: req.body.password,
       });
-      ctx.body = { data: 'sccess' };
+      ctx.body = { data: "sccess" };
     } catch (err) {
       ctx.body = { err };
     }
@@ -636,7 +638,7 @@ class DeployController extends Controller {
       if (users.length > 0) {
         ctx.body = { data: req.body.username };
       } else {
-        ctx.body = { err: { code: '用户名或密码错误' } };
+        ctx.body = { err: { code: "用户名或密码错误" } };
       }
     } catch (err) {
       ctx.body = { err };
@@ -645,11 +647,17 @@ class DeployController extends Controller {
   // 记录列表
   async getRecordList(ctx) {
     const { request: req, response: res } = ctx;
+    const page = req.query.page || 1;
+    const pageSize = req.query.pageSize || 30;
     try {
-      const records = await ctx.model.Record.find();
-      ctx.body = { data: records };
+      const records = await ctx.model.Record.find()
+        .sort({ time: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize);
+      const total = await ctx.model.Record.countDocuments();
+      ctx.body = { data: { list: records, page, total } };
     } catch (err) {
-      ctx.body = { data: '暂无记录' };
+      ctx.body = { data: "暂无记录" };
     }
   }
   // 删除记录数据
@@ -657,9 +665,9 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     const result = await ctx.model.Record.deleteOne(req.body.item);
     if (result.deletedCount === 1) {
-      ctx.body = { data: 'success' };
+      ctx.body = { data: "success" };
     } else {
-      ctx.body = { err: { code: '删除失败' } };
+      ctx.body = { err: { code: "删除失败" } };
     }
   }
   // 运行脚本到指定服务器
@@ -668,27 +676,19 @@ class DeployController extends Controller {
     const targetHost = req.body.host;
     const targetScriptName = req.body.cmd;
     const env = req.headers.env;
-    console.log("服务器名称：",targetHost, "脚本名称：",targetScriptName,"env:",env);
-    // try {
-    //   const hostsFilePath = path.resolve(req.context.hostsFile);
-    //   const hostsData = await readFile(hostsFilePath, 'utf-8');
-    //   console.log("服务器列表文件配置：", hostsData);
-    // } catch (err) {
-    //   console.error("读取服务器列表文件失败：", err);
-    // }
-    //
-    // try {
-    //   const scriptFilePath = path.resolve(req.context.scriptDir, targetScriptName);
-    //   const scriptData = await readFile(scriptFilePath, 'utf-8');
-    //   console.log("脚本文件内容：", scriptData);
-    // } catch (err) {
-    //   console.error("读取脚本文件失败：", err);
-    // }
-
-    let serverConfig = '';
+    console.log(
+      "服务器名称：",
+      targetHost,
+      "脚本名称：",
+      targetScriptName,
+      "env:",
+      env
+    );
+    
+    let serverConfig = "";
     try {
       const hostsFilePath = path.resolve(req.context.hostsFile);
-      const hostsData = await readFile(hostsFilePath, 'utf-8');
+      const hostsData = await readFile(hostsFilePath, "utf-8");
       const hostsJson = JSON.parse(hostsData);
       serverConfig = hostsJson[targetHost];
       if (!serverConfig) {
@@ -700,12 +700,15 @@ class DeployController extends Controller {
       ctx.body = { err: "服务器配置读取失败" };
       return;
     }
-    const [host, password] = serverConfig.split(':');
+    const [host, password] = serverConfig.split(":");
     // 读取脚本文件的内容
     let scriptData;
     try {
-      const scriptFilePath = path.resolve(req.context.scriptDir, targetScriptName);
-      scriptData = await readFile(scriptFilePath, 'utf-8');
+      const scriptFilePath = path.resolve(
+        req.context.scriptDir,
+        targetScriptName
+      );
+      scriptData = await readFile(scriptFilePath, "utf-8");
     } catch (err) {
       console.error("读取脚本文件失败：", err);
       ctx.body = { err: "脚本读取失败" };
@@ -722,13 +725,13 @@ class DeployController extends Controller {
     // 调用封装好的执行方法
     try {
       await ctx.service.executer.run(server, finalScript);
-      ctx.body = { data: 'success' };
+      ctx.body = { data: "success" };
     } catch (err) {
       console.error("脚本执行失败：", err);
       ctx.body = { err: "脚本执行失败" };
     }
 
-    ctx.body = { data: 'sccess' };
+    ctx.body = { data: "sccess" };
   }
 }
 module.exports = DeployController;
