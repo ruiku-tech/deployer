@@ -15,4 +15,5 @@ export default {
     }
     this.env.value = value;
   },
+  selectedCompose: "",
 };

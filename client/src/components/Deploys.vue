@@ -90,10 +90,10 @@
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="40" />
-        <el-table-column prop="name" label="脚本名字">
+        <el-table-column prop="name" label="脚本名字" width="160">
           <template #header>
             <div class="header-with-filter">
-              <span>脚本名字</span>
+              <span>名字</span>
               <el-input
                 class="filter-input"
                 v-model="filterKey"
@@ -109,14 +109,14 @@
           width="180"
           style="font-size: 12px"
         />
-        <el-table-column label="执行脚本" width="200">
+        <el-table-column label="执行脚本" width="180">
           <template #default="scope">
             <div class="cmd" v-for="(item, i) in scope.row.cmds" :key="i">
               {{ item }}
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160">
+        <el-table-column label="操作" width="100">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="edit(scope.row)"
               >修改</el-button
@@ -144,10 +144,13 @@ import {
   fetchScripts,
   saveBat,
   saveBatItem,
-  deleteBatItem, APIGetHostSelect, APIRunScript,
+  deleteBatItem,
+  APIGetHostSelect,
+  APIRunScript,
 } from "../api";
 import DeployConfirm from "./DeployConfirm.vue";
 import { confirmDelete } from "../utils";
+import dataCenter from "../dataCenter";
 
 export default {
   name: "deploys",
@@ -157,7 +160,7 @@ export default {
       list: [],
       hosts: [],
       scripts: [],
-      compose: "",
+      compose: dataCenter.selectedCompose,
       composes: [],
       form: {
         name: "",
@@ -168,7 +171,7 @@ export default {
       deploying: false,
       collapse: [],
       filterKey: "",
-      select:"",
+      select: "",
     };
   },
   computed: {
@@ -181,6 +184,7 @@ export default {
   },
   watch: {
     compose(value) {
+      dataCenter.selectedCompose = value;
       if (value) {
         this.fresh();
       }
@@ -197,65 +201,65 @@ export default {
     },
     initHost() {
       fetchHosts()
-          .then((data) => {
-            this.hosts = Object.keys(data);
-          })
-          .catch((error) => {
-            console.error('Failed to fetch hosts:', error);
-            ElMessage.error('获取主机信息失败');
-          });
+        .then((data) => {
+          this.hosts = Object.keys(data);
+        })
+        .catch((error) => {
+          console.error("Failed to fetch hosts:", error);
+          ElMessage.error("获取主机信息失败");
+        });
     },
     initScripts() {
       fetchScripts()
-          .then((data) => {
-            this.scripts = data;
-          })
-          .catch((error) => {
-            console.error('Failed to fetch scripts:', error);
-            ElMessage.error('获取脚本信息失败');
-          });
+        .then((data) => {
+          this.scripts = data;
+        })
+        .catch((error) => {
+          console.error("Failed to fetch scripts:", error);
+          ElMessage.error("获取脚本信息失败");
+        });
     },
     freshComposes() {
       fetchBats()
-          .then((data) => {
-            this.composes = data;
-            if (!this.composes.includes(this.compose)) {
-              this.compose = this.composes[0].name;
-            }
-          })
-          .catch((error) => {
-            console.error('Failed to fetch bat composes:', error);
-            ElMessage.error('获取编排组合失败');
-          });
+        .then((data) => {
+          this.composes = data;
+          if (!this.composes.includes(this.compose)) {
+            this.compose = this.composes[0].name;
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to fetch bat composes:", error);
+          ElMessage.error("获取编排组合失败");
+        });
     },
     fresh() {
       if (!this.compose) return;
       fetchBat(this.compose)
-          .then((data) => {
-            this.list = Object.entries(data).map(([name, value]) => ({
-              ...value,
-              name,
-            }));
-          })
-          .catch((error) => {
-            console.error('Failed to fetch bat:', error);
-            ElMessage.error('获取编排组合详情失败');
-          });
+        .then((data) => {
+          this.list = Object.entries(data).map(([name, value]) => ({
+            ...value,
+            name,
+          }));
+        })
+        .catch((error) => {
+          console.error("Failed to fetch bat:", error);
+          ElMessage.error("获取编排组合详情失败");
+        });
     },
     del(item) {
       confirmDelete()
-          .then(() => {
-            deleteBatItem(this.compose, item.name)
-                .then(this.fresh)
-                .catch((error) => {
-                  console.error('Failed to delete bat item:', error);
-                  ElMessage.error('删除编排组合项失败');
-                });
-          })
-          .catch((error) => {
-            console.error('Failed to confirm delete:', error);
-            ElMessage.error('确认删除失败');
-          });
+        .then(() => {
+          deleteBatItem(this.compose, item.name)
+            .then(this.fresh)
+            .catch((error) => {
+              console.error("Failed to delete bat item:", error);
+              ElMessage.error("删除编排组合项失败");
+            });
+        })
+        .catch((error) => {
+          console.error("Failed to confirm delete:", error);
+          ElMessage.error("确认删除失败");
+        });
     },
     edit(item) {
       const data = JSON.parse(JSON.stringify(item));
@@ -276,12 +280,12 @@ export default {
       const cmds = this.form.cmds.concat().map((item) => item.value);
       const body = { cmds, name: this.form.name, host: this.form.host };
       saveBatItem(this.compose, body)
-          .then(this.fresh)
-          .then(this.reset)
-          .catch((error) => {
-            console.error('Failed to save bat item:', error);
-            ElMessage.error('保存编排组合项失败');
-          });
+        .then(this.fresh)
+        .then(this.reset)
+        .catch((error) => {
+          console.error("Failed to save bat item:", error);
+          ElMessage.error("保存编排组合项失败");
+        });
     },
     reset() {
       this.form.cmds = [];
@@ -307,35 +311,35 @@ export default {
     },
     addCompose() {
       ElMessageBox.prompt("输入组合名字", "新增编排组合")
-          .then(({ value }) => {
-            if (value) {
-              saveBat(value)
-                  .then(this.freshComposes)
-                  .catch((error) => {
-                    console.error('Failed to save bat:', error);
-                    ElMessage.error('保存编排组合失败');
-                  });
-            }
-          })
-          .catch((error) => {
-            console.error('Failed to prompt for new compose name:', error);
-            ElMessage.error('获取新编排组合名字失败');
-          });
+        .then(({ value }) => {
+          if (value) {
+            saveBat(value)
+              .then(this.freshComposes)
+              .catch((error) => {
+                console.error("Failed to save bat:", error);
+                ElMessage.error("保存编排组合失败");
+              });
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to prompt for new compose name:", error);
+          ElMessage.error("获取新编排组合名字失败");
+        });
     },
     delCompose() {
       confirmDelete()
-          .then(() => {
-            deleteBat(this.compose)
-                .then(this.freshComposes)
-                .catch((error) => {
-                  console.error('Failed to delete compose:', error);
-                  ElMessage.error('删除编排组合失败');
-                });
-          })
-          .catch((error) => {
-            console.error('Failed to confirm delete:', error);
-            ElMessage.error('确认删除失败');
-          });
+        .then(() => {
+          deleteBat(this.compose)
+            .then(this.freshComposes)
+            .catch((error) => {
+              console.error("Failed to delete compose:", error);
+              ElMessage.error("删除编排组合失败");
+            });
+        })
+        .catch((error) => {
+          console.error("Failed to confirm delete:", error);
+          ElMessage.error("确认删除失败");
+        });
     },
   },
 };

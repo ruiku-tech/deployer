@@ -47,7 +47,7 @@
 <script>
 import { ElMessage, dayjs } from "element-plus";
 import { deploy, fetchFiles, fetchScript } from "../api";
-import { prodConfirm } from "../utils"
+import { prodConfirm } from "../utils";
 import dataCenter from "../dataCenter";
 export default {
   name: "deploy-confirm",
@@ -68,7 +68,10 @@ export default {
   },
   methods: {
     initFileOptions() {
-      fetchFiles().then((data) => (this.fileOptions = data));
+      fetchFiles().then(
+        (data) =>
+          (this.fileOptions = data.sort((a, b) => (a.file > b.file ? -1 : 1)))
+      );
     },
     async init() {
       // [{name:string,host:string,cmds:string[]}]
@@ -129,7 +132,11 @@ export default {
         ret[item.name] = item.value;
         return ret;
       }, {});
-      prodConfirm().then(()=>deploy(this.list, dataCenter.env.value, files).then(this.close)).catch()
+      prodConfirm()
+        .then(() =>
+          deploy(this.list, dataCenter.env.value, files).then(this.close)
+        )
+        .catch();
     },
   },
 };

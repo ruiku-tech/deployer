@@ -17,11 +17,22 @@
       </template>
       <el-table
         @selection-change="onSelectionChange"
-        :data="list"
+        :data="finalList"
         style="width: 100%"
       >
         <el-table-column type="selection" width="40" />
         <el-table-column prop="file" label="文件名" >
+          <template #header>
+            <div class="header-with-filter">
+              <span>文件名</span>
+              <el-input
+                class="filter-input"
+                v-model="filterKey"
+                size="small"
+                placeholder="过滤"
+              />
+            </div>
+          </template>
           <template #default="scope">
             <span>
               {{scope.row.file}}
@@ -144,7 +155,16 @@ export default {
       inputs: '',
       list: [],
       selected: [],
+      filterKey: "",
     };
+  },
+  computed:{
+    finalList() {
+      if (this.filterKey) {
+        return this.list.filter((item) => item.file.includes(this.filterKey));
+      }
+      return this.list;
+    },
   },
 
   mounted() {
@@ -153,7 +173,7 @@ export default {
   methods: {
     fresh() {
       fetchFilesStat().then(
-        (list) => (this.list = list.sort((a, b) => (a.file > b.file ? 1 : -1)))
+        (list) => (this.list = list.sort((a, b) => (a.file > b.file ? -1 : 1)))
       );
     },
     upload() {
@@ -205,4 +225,13 @@ export default {
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
-<style scoped></style>
+<style scoped>
+.header-with-filter {
+  display: flex;
+  flex-direction: row;
+}
+.filter-input {
+  flex: 1;
+  margin-left: 10px;
+}
+</style>
