@@ -10,8 +10,8 @@
             <el-form-item label="服务器ip" prop="host">
               <el-input v-model="form.host" />
             </el-form-item>
-            <el-form-item label="服务器密码" prop="password">
-              <el-input v-model="form.password" />
+            <el-form-item label="服务器密码/密钥" prop="password">
+              <el-input v-model="form.password" placeholder="如果长度大于等于32位则自动识别为密钥"/>
             </el-form-item>
             <el-form-item>
               <el-button type="primary" @click="save">保存</el-button>
@@ -31,7 +31,7 @@
       <el-table :data="list" style="width: 100%">
         <el-table-column prop="name" label="名字" />
         <el-table-column prop="host" label="IP" width="200" />
-        <el-table-column prop="password" label="密码" width="200" />
+        <el-table-column prop="password" label="密码/密钥" width="200" />
         <el-table-column label="操作" width="120">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="edit(scope.row)"

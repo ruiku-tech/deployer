@@ -1,9 +1,9 @@
 <template>
   <div class="content">
-    <div class="panel">
+    <div class="panel" style="display: flex; flex-direction: row; align-items: center">
       <input ref="file" type="file" placeholder="请选择文件" />
+      <el-input v-model="inputs" style="flex: 1;border-radius: 18px;margin-left: 10px" placeholder="关于本次更新包的介绍" />
       <el-button type="primary" round @click="upload">上传</el-button>
-      <el-input v-model="inputs" style="width: 180px;border-radius: 18px;margin-left: 10px" placeholder="关于本次更新包的介绍" />
     </div>
     <el-card class="box-card">
       <template #header>
@@ -24,14 +24,14 @@
         <el-table-column prop="file" label="文件名" >
           <template #default="scope">
             <span>
-              {{scope.row.file.split('||')[0]}}
+              {{scope.row.file}}
             </span>
           </template>
         </el-table-column>
         <el-table-column  label="版本介绍" >
           <template #default="scope">
             <span>
-              {{scope.row.file.split('||')[1]}}
+              {{scope.row.memo}}
             </span>
           </template>
         </el-table-column>

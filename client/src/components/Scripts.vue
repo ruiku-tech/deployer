@@ -55,10 +55,10 @@
       <el-form-item label="服务器列表" :label-width="formLabelWidth">
         <el-select v-model="select" placeholder="选择服务器">
           <el-option
-              v-for="(label, value) in serverOptions"
-              :key="value"
+              v-for="(label) in serverOptions"
+              :key="label"
               :label="label"
-              :value="value"
+              :value="label"
           />
         </el-select>
       </el-form-item>
@@ -76,7 +76,7 @@
 
 <script>
 import { ElMessage } from "element-plus";
-import {APIGetHostSelect, APIRunScript, deleteScript, fetchScript, fetchScripts, saveScript} from "../api";
+import {APIGetHostSelect, run, deleteScript, fetchScript, fetchScripts, saveScript} from "../api";
 import { confirmDelete } from "../utils";
 
 export default {
@@ -136,7 +136,7 @@ export default {
       this.dialogFormVisible = true
       APIGetHostSelect()
           .then((resp) => {
-            this.serverOptions = resp;
+            this.serverOptions = Object.keys(resp)
           })
           .catch((error) => {
             console.error('Failed to get host select:', error);
@@ -146,9 +146,8 @@ export default {
     confirmRunScript(){
       this.dialogFormVisible = false
       console.log("select", this.select)
-      APIRunScript(this.select, this.currentScript).then(resp =>{
 
-      }).catch((error) => {
+      run(this.select, this.currentScript,false).catch((error) => {
         console.error('Failed to get host select:', error);
         ElMessage.error('执行失败，稍后再试');
       })

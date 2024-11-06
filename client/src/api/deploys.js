@@ -28,3 +28,7 @@ export function deploySSL(server, domain) {
     { timeout: 10 * 60 * 1000 }
   );
 }
+
+export function historyDelete(text) {
+  return service.post("/script/delete", { text });
+}

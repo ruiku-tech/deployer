@@ -124,9 +124,6 @@
             <el-button link type="primary" size="small" @click="del(scope.row)"
               >删除</el-button
             >
-<!--            <el-button link type="primary" size="small" @click="runTo(scope.row)"-->
-<!--            >运行到</el-button-->
-<!--            >-->
           </template>
         </el-table-column>
       </el-table>
@@ -135,30 +132,6 @@
       <DeployConfirm :list="selected" v-on:close="deploying = false" />
     </el-dialog>
   </div>
-
-
-  <el-dialog v-model="dialogFormVisible" title="服务器列表" width="500">
-    <el-form :model="form">
-      <el-form-item label="服务器列表" :label-width="formLabelWidth">
-        <el-select v-model="select" placeholder="选择服务器">
-          <el-option
-              v-for="(label, value) in serverOptions"
-              :key="value"
-              :label="label"
-              :value="value"
-          />
-        </el-select>
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <div class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmRunScript()">
-          确认
-        </el-button>
-      </div>
-    </template>
-  </el-dialog>
 </template>
 
 <script>
@@ -195,8 +168,6 @@ export default {
       deploying: false,
       collapse: [],
       filterKey: "",
-      dialogFormVisible:false,
-      serverOptions: {},
       select:"",
     };
   },
@@ -219,23 +190,6 @@ export default {
     this.fresh();
   },
   methods: {
-    confirmRunScript(){
-      this.dialogFormVisible = false
-      console.log("select", this.select)
-      // APIRunScript()
-    },
-    runTo(row){
-      console.log("ssssss",row.cmds)
-      this.dialogFormVisible = true
-      APIGetHostSelect()
-          .then((resp) => {
-            this.serverOptions = resp;
-          })
-          .catch((error) => {
-            console.error('Failed to get host select:', error);
-            ElMessage.error('获取服务器选项失败');
-          });
-    },
     reload() {
       this.initHost();
       this.initScripts();
