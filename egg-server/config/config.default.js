@@ -1,5 +1,6 @@
 /* eslint valid-jsdoc: "off" */
 const path = require("path");
+const crypto = require("crypto");
 /**
  * @param {Egg.EggAppInfo} appInfo app info
  */
@@ -21,6 +22,10 @@ module.exports = (appInfo) => {
     csrf: {
       enable: false,
     },
+  };
+  config.jwt = {
+    secret: crypto.randomBytes(32).toString("hex"),
+    expiresIn: "30m",
   };
 
   config.cors = {

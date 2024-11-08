@@ -11,7 +11,7 @@ const config = require("../service/config");
 const pump = require("mz-modules/pump");
 const fileMemo = require("../model/FileMemo");
 const scriptRecord = require("../model/ScriptRecord");
-
+const speakeasy = require("speakeasy");
 const userFile = config.userFile();
 const storage = multer.diskStorage({
   destination(req, file, cb) {
@@ -610,12 +610,23 @@ class DeployController extends Controller {
   // 注册
   async postRegister(ctx) {
     const { request: req, response: res } = ctx;
+    const verified = speakeasy.totp.verify({
+      secret: "EQQWMZ2IKRXHSQLCFBNEAS2JEFZHQMTOFIVEO6RJIZGHO2CAMRNA", // 使用生成的密钥
+      encoding: "base32",
+      token: req.body.code, // 用户从 Google Authenticator 中获取的验证码
+      window: 1, // 容忍的时间窗口
+    });
+
+    if (!verified) {
+      return (ctx.body = { err: { code: "code码错误" } });
+    }
     const jsonData = await ctx.model.User.find({
       username: req.body.username,
     });
     if (jsonData.length > 0) {
       return (ctx.body = { err: { code: "用户名已注册" } });
     }
+
     try {
       await ctx.model.User.create({
         username: req.body.username,
@@ -629,14 +640,19 @@ class DeployController extends Controller {
   // 登陆
   async postLogin(ctx) {
     const { request: req, response: res } = ctx;
-
     try {
       const users = await ctx.model.User.find({
         username: req.body.username,
         password: req.body.password,
       });
       if (users.length > 0) {
-        ctx.body = { data: req.body.username };
+        const token = ctx.app.jwt.sign(
+          { username: req.body.username, password: req.body.password },
+          ctx.app.config.jwt.secret,
+          { expiresIn: ctx.app.config.jwt.expiresIn }
+        );
+
+        ctx.body = { data: { username: req.body.username, token: token } };
       } else {
         ctx.body = { err: { code: "用户名或密码错误" } };
       }
@@ -684,7 +700,7 @@ class DeployController extends Controller {
       "env:",
       env
     );
-    
+
     let serverConfig = "";
     try {
       const hostsFilePath = path.resolve(req.context.hostsFile);
