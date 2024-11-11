@@ -26,11 +26,12 @@
           />
         </el-form-item>
         <el-form-item>
-
           <el-button type="primary" @click="commit()">执行</el-button>
           <el-button @click="reset()">重置</el-button>
           <el-button @click="showHistoryScript()">历史记录</el-button>
-          <el-checkbox v-model="checked" style="margin-left: 20px">保留本次脚本记录</el-checkbox>
+          <el-checkbox v-model="checked" style="margin-left: 20px"
+            >保留本次脚本记录</el-checkbox
+          >
         </el-form-item>
       </el-form>
     </div>
@@ -83,30 +84,40 @@
       <el-button type="primary" @click="logOut()">退出</el-button>
     </div>
   </div>
-  <el-drawer v-model="drawer" title="历史记录" :size="500" :with-header="true" direction="rtl">
+  <el-drawer
+    v-model="drawer"
+    title="历史记录"
+    :size="500"
+    :with-header="true"
+    direction="rtl"
+  >
     <el-table :data="anchorData" style="width: 100%" @cell-click="clickText">
-      <el-table-column prop="text" label="脚本内容1">
+      <el-table-column prop="text" label="脚本内容1"> </el-table-column>
+      <el-table-column fixed="right" label="操作" width="52">
+        <template #default="scope">
+          <el-button
+            @click.native.stop="deleteHistory(scope.$index)"
+            type="text"
+            size="small"
+          >
+            移除
+          </el-button>
+        </template>
       </el-table-column>
-      <el-table-column
-      fixed="right"
-      label="操作"
-      width="52">
-      <template #default="scope">
-        <el-button
-          @click.native.stop="deleteHistory(scope.$index)"
-          type="text"
-          size="small">
-          移除
-        </el-button>
-      </template>
-    </el-table-column>
     </el-table>
   </el-drawer>
 </template>
 
 <script>
 import { ElMessage } from "element-plus";
-import {fetchHosts, run, deploySSL, apiAuto, APIGetHistoryScript, historyDelete} from "../api";
+import {
+  fetchHosts,
+  run,
+  deploySSL,
+  apiAuto,
+  APIGetHistoryScript,
+  historyDelete,
+} from "../api";
 import dataCenter from "../dataCenter";
 import service from "@/api/base";
 export default {
@@ -129,7 +140,7 @@ export default {
         prefix: "",
       },
       checked: true,
-      drawer : false,
+      drawer: false,
       anchorData: [],
     };
   },
@@ -139,24 +150,24 @@ export default {
     this.anchorData = [];
   },
   methods: {
-    clickText(row, column, cell, event){
+    clickText(row, column, cell, event) {
       this.drawer = false;
-      this.form.data = row.text
+      this.form.data = row.text;
     },
-    showHistoryScript(){
-      this.drawer = true
-      if(this.anchorData.length > 0) return
-      APIGetHistoryScript().then(resp =>{
-        this.anchorData = resp
-      })
+    showHistoryScript() {
+      this.drawer = true;
+      if (this.anchorData.length > 0) return;
+      APIGetHistoryScript().then((resp) => {
+        this.anchorData = resp;
+      });
     },
-    deleteHistory(index){
-      const item = this.anchorData[index]
-      if(item){
-        historyDelete(item.text).then(resp=>{
-          ElMessage.success("删除成功")
-          this.anchorData.splice(index,1)
-        })
+    deleteHistory(index) {
+      const item = this.anchorData[index];
+      if (item) {
+        historyDelete(item.text).then((resp) => {
+          ElMessage.success("删除成功");
+          this.anchorData.splice(index, 1);
+        });
       }
     },
     reload() {
@@ -182,7 +193,7 @@ export default {
       if (!this.form.data) {
         return ElMessage.error("请输入脚本");
       }
-      run(this.form.host, this.form.data,this.checked);
+      run(this.form.host, this.form.data, this.checked);
     },
     reset() {
       this.$refs.formRef.resetFields();
@@ -216,7 +227,8 @@ export default {
       apiAuto(this.apiForm.host, this.apiForm.port, this.apiForm.prefix);
     },
     logOut() {
-      dataCenter.user.value = "";
+      localStorage.removeItem("token");
+      dataCenter.token.value = "";
     },
   },
 };

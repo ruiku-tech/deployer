@@ -1,6 +1,6 @@
 <template>
-  <Login v-if="!dataCenter.user"></Login>
-  <div class="main" v-if="dataCenter.user">
+  <Login v-if="!dataCenter.token"></Login>
+  <div class="main" v-if="dataCenter.token">
     <Operator />
     <Spliter />
     <Logger />
@@ -24,6 +24,7 @@ export default {
   data() {
     return {
       dataCenter,
+      onLogin: true,
     };
   },
   components: {
@@ -35,9 +36,9 @@ export default {
     Login,
   },
   mounted() {
-    const user = localStorage.getItem("user");
-    if (user) {
-      dataCenter.user.value = user;
+    const token = localStorage.getItem("token");
+    if (token) {
+      dataCenter.token.value = token;
     }
   },
 };
