@@ -30,4 +30,8 @@ cd /usr/egg-server
 
 npm install
 
+npm run mk-key
+
+source ~/.bashrc
+
 npm run start

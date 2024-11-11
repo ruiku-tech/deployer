@@ -48,7 +48,8 @@
     "lint": "eslint .",
     "ci": "npm run lint && npm run cov",
     "pack": "node scripts/pack.js",
-    "upgrade": "node scripts/upgrade.js"
+    "upgrade": "node scripts/upgrade.js",
+    "mk-key": "node scripts/google.js"
   },
   "repository": {
     "type": "git",
