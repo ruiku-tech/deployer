@@ -17,6 +17,9 @@
               v-model="registerForm.password"
             ></el-input>
           </el-form-item>
+          <el-form-item v-if="loginModel == '1'" label="code:" prop="code">
+            <el-input type="password" v-model="registerForm.code"></el-input>
+          </el-form-item>
           <el-button style="width: 100%" type="primary" @click="submit">{{
             loginModel == "0" ? "登陆" : "注册"
           }}</el-button>
@@ -38,6 +41,7 @@ export default {
       registerForm: {
         username: "",
         password: "",
+        code: "",
       },
       loginForm: {
         username: "",
@@ -51,19 +55,21 @@ export default {
       if (this.loginModel == "0") {
         login(this.registerForm.username, this.registerForm.password).then(
           (data) => {
-            localStorage.setItem("user", data);
-            dataCenter.user.value = data;
+            localStorage.setItem("token", data.token);
+            dataCenter.token.value = data.token;
           }
         );
       } else {
-        register(this.registerForm.username, this.registerForm.password).then(
-          (data) => {
-            if (data == "sccess") {
-              ElMessage.success("注册成功");
-              this.loginModel = "0";
-            }
+        register(
+          this.registerForm.username,
+          this.registerForm.password,
+          this.registerForm.code
+        ).then((data) => {
+          if (data == "sccess") {
+            ElMessage.success("注册成功");
+            this.loginModel = "0";
           }
-        );
+        });
       }
     },
   },

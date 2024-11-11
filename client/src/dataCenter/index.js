@@ -7,6 +7,7 @@ export default {
   env: reactive({ value: localStorage.getItem("ENV") }),
   envList: ref([]),
   user: ref(""),
+  token: ref(""),
   setEnv(value) {
     if (value) {
       localStorage.setItem("ENV", value);
