@@ -24,7 +24,7 @@ module.exports = (appInfo) => {
     },
   };
   config.jwt = {
-    secret: crypto.randomBytes(32).toString("hex"),
+    secret: process.env.DEPLOY_JWT || crypto.randomBytes(32).toString("hex"),
     expiresIn: "30m",
   };
 

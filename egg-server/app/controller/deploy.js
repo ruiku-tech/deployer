@@ -486,7 +486,7 @@ class DeployController extends Controller {
     // [{name:string,host:string,cmds:string[]}]
     let list = req.body.list;
     const env = req.body.env;
-    const recordList = list;
+    const recordList = list.map(item => ({...item,username:ctx.state.user.username}));
     if (!list || !list.length) {
       return (ctx.body = { err: "请选择部署的脚本" });
     }
@@ -650,7 +650,7 @@ class DeployController extends Controller {
       });
       if (users.length > 0) {
         const token = ctx.app.jwt.sign(
-          { username: req.body.username, password: req.body.password },
+          { username: req.body.username },
           ctx.app.config.jwt.secret,
           { expiresIn: ctx.app.config.jwt.expiresIn }
         );

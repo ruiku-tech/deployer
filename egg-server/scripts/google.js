@@ -2,6 +2,7 @@ const speakeasy = require("speakeasy");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const crypto = require('crypto');
 
 function setEnvVariable(varName, value) {
   // 获取用户主目录并定位 .bashrc 文件
@@ -49,4 +50,8 @@ if (googlekey) {
     process.exit(1)
     console.log("谷歌生成失败:", secret);
   }
+}
+const jwtkey = process.env.DEPLOY_JWT;
+if(!jwtkey){
+  setEnvVariable("DEPLOY_JWT", crypto.randomBytes(32).toString("hex"));
 }

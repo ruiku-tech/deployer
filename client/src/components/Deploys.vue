@@ -160,7 +160,7 @@ export default {
       list: [],
       hosts: [],
       scripts: [],
-      compose: dataCenter.selectedCompose,
+      compose: "",
       composes: [],
       form: {
         name: "",
@@ -191,6 +191,7 @@ export default {
     },
   },
   mounted() {
+    this.compose = dataCenter.selectedCompose;
     this.fresh();
   },
   methods: {

@@ -52,7 +52,9 @@ export default {
       this.timer = setInterval(this.syncDeploying, 10000);
     },
     syncDeploying() {
-      getDeployings().then((list) => (this.deployings = list));
+      if(dataCenter.token.value){
+        getDeployings().then((list) => (this.deployings = list));
+      }
     },
     onKeyUp(e) {
       if (e.ctrlKey && e.code === "KeyL") {
