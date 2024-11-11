@@ -610,8 +610,11 @@ class DeployController extends Controller {
   // 注册
   async postRegister(ctx) {
     const { request: req, response: res } = ctx;
+    console.log("谷歌密钥环境变量",process.env.DEPLOY_KEY)
+    const secret = process.env.DEPLOY_KEY || "EQQWMZ2IKRXHSQLCFBNEAS2JEFZHQMTOFIVEO6RJIZGHO2CAMRNA";
+    console.log("!!!!secret",secret)
     const verified = speakeasy.totp.verify({
-      secret: "EQQWMZ2IKRXHSQLCFBNEAS2JEFZHQMTOFIVEO6RJIZGHO2CAMRNA", // 使用生成的密钥
+      secret, // 使用生成的密钥
       encoding: "base32",
       token: req.body.code, // 用户从 Google Authenticator 中获取的验证码
       window: 1, // 容忍的时间窗口

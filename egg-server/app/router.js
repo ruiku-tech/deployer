@@ -39,7 +39,7 @@ module.exports = (app) => {
   // 获取服务器列表
   router.get("/deploy/hosts", auth, deployMiddle, controller.deploy.getHosts);
   // 获取服务器列表
-  router.post("/deploy/hosts", deployMiddle, controller.deploy.postHosts);
+  router.post("/deploy/hosts",auth, deployMiddle, controller.deploy.postHosts);
 
   // 获取配置列表
   router.get(
