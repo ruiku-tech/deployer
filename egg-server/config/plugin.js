@@ -24,4 +24,8 @@ module.exports = {
     enable: true,
     package: "egg-jwt",
   },
+  dotenv: {
+    enable: true,
+    package: "egg-dotenv",
+  },
 };
