@@ -192,7 +192,9 @@ export default {
   },
   mounted() {
     this.compose = dataCenter.selectedCompose;
-    this.fresh();
+  },
+  activated(){
+    this.compose = dataCenter.selectedCompose;
   },
   methods: {
     reload() {

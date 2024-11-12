@@ -25,7 +25,7 @@ module.exports = (appInfo) => {
   };
   config.jwt = {
     secret: process.env.DEPLOY_JWT || crypto.randomBytes(32).toString("hex"),
-    expiresIn: "30m",
+    expiresIn: "120m",
   };
 
   config.cors = {

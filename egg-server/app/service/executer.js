@@ -335,6 +335,9 @@ class ExecuterService extends Service {
           if (index >= 0) {
             deploying.splice(index, 1);
           }
+        }).on("error",(e)=>{
+          broadcast.cast(`NORM:[${item.host}] 连接异常:${e.message}`, this.env);
+          readyReject();
         });
       item = {
         conn,
