@@ -193,7 +193,7 @@ export default {
   mounted() {
     this.compose = dataCenter.selectedCompose;
   },
-  activated(){
+  activated() {
     this.compose = dataCenter.selectedCompose;
   },
   methods: {
@@ -226,8 +226,13 @@ export default {
       fetchBats()
         .then((data) => {
           this.composes = data;
-          if (!this.composes.includes(this.compose)) {
+          const isFind = this.composes.find(
+            (item) => item.name === this.compose
+          );
+          if (!isFind) {
             this.compose = this.composes[0].name;
+          } else {
+            this.fresh();
           }
         })
         .catch((error) => {
