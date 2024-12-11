@@ -6,8 +6,8 @@ export function deploy(list, env, files) {
 
 // host:pasword
 // 脚本
-export function run(server, cmd,cache ) {
-  return service.post("/run", { server, cmd ,cache});
+export function run(server, cmd, cache) {
+  return service.post("/run", { server, cmd, cache });
 }
 export function APIGetHistoryScript() {
   return service.post("/script/detail");
@@ -31,4 +31,8 @@ export function deploySSL(server, domain) {
 
 export function historyDelete(text) {
   return service.post("/script/delete", { text });
+}
+
+export function selfUpdate(token) {
+  return service.post("/selfupdate", { token });
 }

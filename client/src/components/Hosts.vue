@@ -48,7 +48,7 @@
 </template>
 
 <script>
-import { fetchHosts, saveHosts } from "../api";
+import { fetchHosts, saveHosts, deleteHosts } from "../api";
 import { ElMessage } from "element-plus";
 import { confirmDelete } from "../utils";
 
@@ -81,10 +81,7 @@ export default {
     },
     del(item) {
       confirmDelete().then(() => {
-        const list = this.list.filter((the) => {
-          return the.name !== item.name;
-        });
-        this.requestSave(list);
+        deleteHosts(item.name).then(this.fresh);
       });
     },
     edit(item) {
@@ -101,11 +98,12 @@ export default {
         return ElMessage.error("请输入服务器ip");
       }
       if (!this.form.password) {
-        return ElMessage.error("请输入服务器密码");
+        return ElMessage.error("请输入服务器密码或密钥");
       }
-      const list = this.list.concat();
-      list.push(Object.assign({}, this.form));
-      this.requestSave(list).then(() => {
+      if (this.form.password.length<4) {
+        return ElMessage.error("密码或密钥太短");
+      }
+      this.requestSave([Object.assign({}, this.form)]).then(() => {
         this.reset();
       });
     },

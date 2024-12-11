@@ -60,7 +60,7 @@ module.exports = (appInfo) => {
       // url: "mongodb://127.0.0.1:33017/server_database",
       // url: 'mongodb://root:DevOps20220601@8.219.118.16:27017/data',
       // url: 'mongodb://43.132.219.112:33017/server_database',
-      url: "mongodb://localhost:27017/server_database",
+      url: "mongodb://43.154.9.221:30001/deployer",
       options: {
         useNewUrlParser: true,
         useUnifiedTopology: true,

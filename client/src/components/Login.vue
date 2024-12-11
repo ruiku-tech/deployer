@@ -60,6 +60,10 @@ export default {
           }
         );
       } else {
+        const err = checkPasswordComplexity(this.registerForm.password);
+        if (err) {
+          return ElMessage.success(err);
+        }
         register(
           this.registerForm.username,
           this.registerForm.password,
@@ -74,6 +78,39 @@ export default {
     },
   },
 };
+function checkPasswordComplexity(password) {
+  const minLength = 6;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumbers = /\d/.test(password);
+  const hasSpecialChars = /[\W_]/.test(password);
+
+  let count = 0;
+  // 检查长度
+  if (password.length < minLength) {
+    return "密码太短了";
+  }
+  // 检查是否包含大写字母
+  if (hasUpperCase) {
+    count++;
+  }
+  // 检查是否包含小写字母
+  if (hasLowerCase) {
+    count++;
+  }
+  // 检查是否包含数字
+  if (hasNumbers) {
+    count++;
+  }
+  // 检查是否包含特殊字符
+  if (hasSpecialChars) {
+    count++;
+  }
+  if (count < 2) {
+    return "数字/大写/小写/特殊字符至少要2种";
+  }
+  return undefined;
+}
 </script>
 
 <style scoped>

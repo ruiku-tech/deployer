@@ -39,8 +39,9 @@ module.exports = (app) => {
   // 获取服务器列表
   router.get("/deploy/hosts", auth, deployMiddle, controller.deploy.getHosts);
   // 获取服务器列表
-  router.post("/deploy/hosts",auth, deployMiddle, controller.deploy.postHosts);
-
+  router.post("/deploy/hosts", auth, deployMiddle, controller.deploy.postHosts);
+  // 获取服务器列表
+  router.delete("/deploy/hosts", auth, deployMiddle, controller.deploy.deleteHost);
   // 获取配置列表
   router.get(
     "/deploy/configs",
@@ -176,6 +177,8 @@ module.exports = (app) => {
   router.post("/deploy/register", controller.deploy.postRegister);
   // 登陆
   router.post("/deploy/login", controller.deploy.postLogin);
+  // 自更新
+  router.post("/deploy/selfupdate", auth, controller.deploy.selfUpdate);
   // 记录列表
   router.get(
     "/deploy/recordList",

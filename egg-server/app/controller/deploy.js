@@ -237,12 +237,20 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     try {
       const data = await readFile(req.context.hostsFile, "utf-8");
-      let jsonData = "";
+      let ret = {};
       try {
-        jsonData = JSON.parse(data);
+        const jsonData = JSON.parse(data);
+        ret = Object.entries(jsonData).reduce((ret, item) => {
+          ret[item[0]] = item[1].replace(/:(.*)$/, ($0, $1) => {
+            return `:${$1.substr(0, 2)}${"*".repeat($1.length - 4)}${$1.substr(
+              -2
+            )}`;
+          });
+          return ret;
+        }, {});
       } catch (error) {}
 
-      ctx.body = { data: jsonData };
+      ctx.body = { data: ret };
     } catch (err) {
       ctx.body = { err };
     }
@@ -251,16 +259,48 @@ class DeployController extends Controller {
   async postHosts(ctx) {
     const { request: req, response: res } = ctx;
 
+    const data = {};
+    if (fs.existsSync(req.context.hostsFile)) {
+      const localData = await readFile(req.context.hostsFile, "utf-8");
+      try {
+        const jsonData = JSON.parse(localData);
+        Object.assign(data, jsonData);
+      } catch (error) {
+        console.log("本地解析已存在的配置失败");
+      }
+    }
+    Object.assign(data, req.body.data);
     try {
-      const data = await writeFile(
+      await writeFile(
         req.context.hostsFile,
-        JSON.stringify(req.body.data, null, 2),
+        JSON.stringify(data, null, 2),
         "utf-8"
       );
       ctx.body = { data: "success" };
     } catch (err) {
       ctx.body = { err };
     }
+  }
+
+  async deleteHost(ctx) {
+    const { request: req, response: res } = ctx;
+    const name = req.query.name;
+    if (fs.existsSync(req.context.hostsFile)) {
+      const localData = await readFile(req.context.hostsFile, "utf-8");
+      try {
+        const jsonData = JSON.parse(localData);
+        delete jsonData[name];
+        await writeFile(
+          req.context.hostsFile,
+          JSON.stringify(jsonData, null, 2),
+          "utf-8"
+        );
+      } catch (error) {
+        ctx.body = { err: error.message };
+        return;
+      }
+    }
+    ctx.body = { data: "success" };
   }
 
   // 获取配置列表
@@ -486,7 +526,10 @@ class DeployController extends Controller {
     // [{name:string,host:string,cmds:string[]}]
     let list = req.body.list;
     const env = req.body.env;
-    const recordList = list.map(item => ({...item,username:ctx.state.user.username}));
+    const recordList = list.map((item) => ({
+      ...item,
+      username: ctx.state.user.username,
+    }));
     if (!list || !list.length) {
       return (ctx.body = { err: "请选择部署的脚本" });
     }
@@ -549,6 +592,13 @@ class DeployController extends Controller {
       const fileDocument = new scriptRecord({ text });
       fileDocument.save().catch(() => {});
     }
+    ctx.model.Record.create({
+      cmds: [req.body.cmd],
+      host: req.body.server,
+      name: "~运行~",
+      username: ctx.state.user.username,
+      time: Date.now(),
+    });
     await ctx.service.executer
       .run(server, req.body.cmd)
       .then(() => {
@@ -610,9 +660,11 @@ class DeployController extends Controller {
   // 注册
   async postRegister(ctx) {
     const { request: req, response: res } = ctx;
-    console.log("谷歌密钥环境变量",process.env.DEPLOY_KEY)
-    const secret = process.env.DEPLOY_KEY || "EQQWMZ2IKRXHSQLCFBNEAS2JEFZHQMTOFIVEO6RJIZGHO2CAMRNA";
-    console.log("!!!!secret",secret)
+    console.log("谷歌密钥环境变量", process.env.DEPLOY_KEY);
+    const secret =
+      process.env.DEPLOY_KEY ||
+      "EQQWMZ2IKRXHSQLCFBNEAS2JEFZHQMTOFIVEO6RJIZGHO2CAMRNA";
+    console.log("!!!!secret", secret);
     const verified = speakeasy.totp.verify({
       secret, // 使用生成的密钥
       encoding: "base32",
@@ -635,6 +687,13 @@ class DeployController extends Controller {
         username: req.body.username,
         password: req.body.password,
       });
+      await ctx.model.Record.create({
+        cmds: [],
+        host: req.ip,
+        name: "注册",
+        username: req.body.username,
+        time: Date.now(),
+      });
       ctx.body = { data: "sccess" };
     } catch (err) {
       ctx.body = { err };
@@ -654,7 +713,13 @@ class DeployController extends Controller {
           ctx.app.config.jwt.secret,
           { expiresIn: ctx.app.config.jwt.expiresIn }
         );
-
+        await ctx.model.Record.create({
+          cmds: [],
+          host: req.ip,
+          name: "登录",
+          username: req.body.username,
+          time: Date.now(),
+        });
         ctx.body = { data: { username: req.body.username, token: token } };
       } else {
         ctx.body = { err: { code: "用户名或密码错误" } };
@@ -751,6 +816,16 @@ class DeployController extends Controller {
     }
 
     ctx.body = { data: "sccess" };
+  }
+
+  async selfUpdate(ctx) {
+    const token = ctx.request.body.token;
+    if (token) {
+      utils.selfUpdate(token);
+      ctx.body = { data: "sccess" };
+    } else {
+      ctx.body = { err: "token为空" };
+    }
   }
 }
 module.exports = DeployController;

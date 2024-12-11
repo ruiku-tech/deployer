@@ -15,8 +15,9 @@
         <el-table-column type="selection" width="40" />
         <el-table-column prop="username" label="用户名" width="100" />
         <el-table-column prop="time" label="时间" width="120" />
-        <el-table-column prop="name" label="脚本名称" />
-        <el-table-column prop="host" label="服务器" />
+        <el-table-column prop="name" label="脚本名称" width="120" />
+        <el-table-column prop="host" label="服务器" width="100"/>
+        <el-table-column prop="cmds" label="内容"/>
       </el-table>
       <el-pagination
         @current-change="onPageChange"

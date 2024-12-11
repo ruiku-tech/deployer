@@ -3,11 +3,20 @@
     <div class="deploying">
       <div class="title">部署中</div>
       <el-checkbox-group v-model="envList">
-        <el-checkbox-button v-for="env in dataCenter.envList" :label="env" :key="env">{{ env.name
-          }}</el-checkbox-button>
+        <el-checkbox-button
+          v-for="env in dataCenter.envList"
+          :label="env"
+          :key="env"
+          >{{ env.name }}</el-checkbox-button
+        >
       </el-checkbox-group>
       <div class="list">
-        <el-tag v-for="deploying in deployings" :key="deploying" closable @close="stop(deploying)">
+        <el-tag
+          v-for="deploying in deployings"
+          :key="deploying"
+          closable
+          @close="stop(deploying)"
+        >
           {{ deploying }}
         </el-tag>
       </div>
@@ -17,10 +26,12 @@
 </template>
 
 <script>
-import { getDeployings, stopDeploy } from "../api";
+import { getDeployings, stopDeploy, selfUpdate } from "../api";
 import dataCenter from "../dataCenter";
 import { confirmDelete } from "../utils";
 import dayjs from "dayjs";
+import { ElMessage, ElMessageBox } from "element-plus";
+
 export default {
   name: "logger",
   data() {
@@ -52,13 +63,27 @@ export default {
       this.timer = setInterval(this.syncDeploying, 10000);
     },
     syncDeploying() {
-      if(dataCenter.token.value){
+      if (dataCenter.token.value) {
         getDeployings().then((list) => (this.deployings = list));
       }
     },
     onKeyUp(e) {
       if (e.ctrlKey && e.code === "KeyL") {
         this.logger.innerHTML = "";
+      } else if (e.ctrlKey && e.code === "KeyU") {
+        ElMessageBox.prompt("输入更新token", "提示", {
+          confirmButtonText: "OK",
+          cancelButtonText: "Cancel",
+        })
+          .then(({ value }) => {
+            selfUpdate(value).then((resp) => {
+              ElMessage({
+                type: "success",
+                message: `命令已启动`,
+              });
+            });
+          })
+          .catch(() => {});
       }
     },
     connect() {
