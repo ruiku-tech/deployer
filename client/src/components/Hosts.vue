@@ -10,8 +10,17 @@
             <el-form-item label="服务器ip" prop="host">
               <el-input v-model="form.host" />
             </el-form-item>
+            <el-form-item label="端口" prop="port">
+              <el-input v-model="form.port" placeholder="默认为22" />
+            </el-form-item>
             <el-form-item label="服务器密码/密钥" prop="password">
-              <el-input v-model="form.password" placeholder="如果长度大于等于32位则自动识别为密钥"/>
+              <el-input
+                type="textarea"
+                :rows="2"
+                autosize
+                v-model="form.password"
+                placeholder="如果长度大于等于32位则自动识别为密钥"
+              />
             </el-form-item>
             <el-form-item>
               <el-button type="primary" @click="save">保存</el-button>
@@ -32,6 +41,7 @@
         <el-table-column prop="name" label="名字" />
         <el-table-column prop="host" label="IP" width="200" />
         <el-table-column prop="password" label="密码/密钥" width="200" />
+        <el-table-column prop="port" label="端口" width="80" />
         <el-table-column label="操作" width="120">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="edit(scope.row)"
@@ -60,6 +70,7 @@ export default {
       form: {
         name: "",
         host: "",
+        port: "",
         password: "",
       },
       collapse: [],
@@ -74,7 +85,12 @@ export default {
         this.list = Object.entries(data)
           .map(([name, value]) => {
             const info = value.split(":");
-            return { name, host: info[0], password: info[1] };
+            return {
+              name,
+              host: info[0],
+              password: info[1],
+              port: info[2] || 22,
+            };
           })
           .sort((a, b) => (a.host === b.host ? 0 : a.host > b.host ? 1 : -1));
       });
@@ -87,7 +103,8 @@ export default {
     edit(item) {
       this.form.name = item.name;
       this.form.host = item.host;
-      this.form.password = item.password;
+      this.form.port = item.port;
+      this.form.password = "";
       this.collapse = ["1"];
     },
     save() {
@@ -100,7 +117,7 @@ export default {
       if (!this.form.password) {
         return ElMessage.error("请输入服务器密码或密钥");
       }
-      if (this.form.password.length<4) {
+      if (this.form.password.length < 4) {
         return ElMessage.error("密码或密钥太短");
       }
       this.requestSave([Object.assign({}, this.form)]).then(() => {
@@ -112,7 +129,7 @@ export default {
     },
     requestSave(list) {
       const data = list.reduce((ret, item) => {
-        ret[item.name] = `${item.host}:${item.password}`;
+        ret[item.name] = `${item.host}:${item.password}:${item.port.trim()}`;
         return ret;
       }, {});
       console.log(data);
