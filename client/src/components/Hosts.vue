@@ -19,7 +19,7 @@
                 :rows="2"
                 autosize
                 v-model="form.password"
-                placeholder="如果长度大于等于32位则自动识别为密钥"
+                placeholder="如果长度大于32位则自动识别为密钥"
               />
             </el-form-item>
             <el-form-item>

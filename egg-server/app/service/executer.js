@@ -320,7 +320,7 @@ class ExecuterService extends Service {
         port,
         username: "root",
       };
-      if (password.length >= 32) {
+      if (password.length > 32) {
         connCfg.privateKey = password;
       } else {
         connCfg.password = password;
