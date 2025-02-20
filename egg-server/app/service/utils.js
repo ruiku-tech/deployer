@@ -25,7 +25,7 @@ function parseHosts() {
   const ret = JSON.parse(fs.readFileSync(this.hostsFile, "utf-8") || "{}");
   return Object.entries(ret).reduce((ret, item) => {
     const info = item[1].split(":");
-    ret[item[0]] = { host: info[0], password: info[1] };
+    ret[item[0]] = { host: info[0], password: info[1], port: info[2] };
     return ret;
   }, {});
 }
