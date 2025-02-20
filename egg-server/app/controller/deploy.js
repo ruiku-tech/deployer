@@ -241,11 +241,8 @@ class DeployController extends Controller {
       try {
         const jsonData = JSON.parse(data);
         ret = Object.entries(jsonData).reduce((ret, item) => {
-          ret[item[0]] = item[1].replace(/:(.*)$/, ($0, $1) => {
-            return `:${$1.substr(0, 2)}${"*".repeat($1.length - 4)}${$1.substr(
-              -2
-            )}`;
-          });
+          const [host,password,port = 22] = item[1].split(":")
+          ret[item[0]] = `${host}:${password.substring(0,2)}****${password.substring(password.length-2)}:${port}`;
           return ret;
         }, {});
       } catch (error) {}
@@ -784,7 +781,7 @@ class DeployController extends Controller {
       ctx.body = { err: "服务器配置读取失败" };
       return;
     }
-    const [host, password] = serverConfig.split(":");
+    const [host, password, port] = serverConfig.split(":");
     // 读取脚本文件的内容
     let scriptData;
     try {
@@ -801,8 +798,9 @@ class DeployController extends Controller {
 
     // 构造服务器对象
     const server = {
-      host: host,
-      password: password,
+      host,
+      password,
+      port
     };
     const finalScript = utils.parseVars.call(scriptData);
 

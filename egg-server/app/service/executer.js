@@ -304,7 +304,7 @@ class ExecuterService extends Service {
       return { server, cmds: cmds.filter((cmd) => cmd) };
     });
   }
-  genConn(host, password) {
+  genConn(host, password, port) {
     let item = deploying.find((item) => item.host === host);
     if (!item) {
       let readyResolve, readyReject;
@@ -317,7 +317,7 @@ class ExecuterService extends Service {
       broadcast.cast(`NORM:[${conn.host}] 开始连接`, this.env);
       const connCfg = {
         host,
-        port: 22,
+        port,
         username: "root",
       };
       if (password.length >= 32) {
@@ -366,7 +366,8 @@ class ExecuterService extends Service {
     const errors = [];
     const host = item.server.host;
     const password = item.server.password;
-    const connect = this.genConn(host, password);
+    const port = item.server.port || 22
+    const connect = this.genConn(host, password, port);
     const conn = connect.conn;
     try {
       await connect.waitReady;
@@ -432,7 +433,6 @@ class ExecuterService extends Service {
   }
 
   async deployList(list) {
-    console.log(list, "真美");
     for (let i = 0; i < list.length; ++i) {
       const item = list[i];
       await this.deply(item);

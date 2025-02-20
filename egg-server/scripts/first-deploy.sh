@@ -11,6 +11,7 @@ docker run -d -p 33017:27017 --name mongo-deploy --restart always mongo:4.4
 
 yum install -y unzip
 
+#curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
 curl -sL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo yum install -y nodejs
 #sudo yum install -y npm
