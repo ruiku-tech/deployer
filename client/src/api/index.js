@@ -10,3 +10,4 @@ export * from "./apiAuto";
 export * from "./register";
 export * from "./login";
 export * from "./recordList";
+export * from "./remote";

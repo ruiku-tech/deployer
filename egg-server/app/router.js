@@ -10,6 +10,7 @@ module.exports = (app) => {
   // router.get("/", controller.home.index);
 
   app.ws.route("/deploy", controller.ws.connect);
+  app.ws.route("/terminal/:env", controller.ws.terminal);
   // 获取变量
   router.get("/deploy/vars", auth, deployMiddle, controller.deploy.getVars);
   // 获取配置
@@ -33,6 +34,20 @@ module.exports = (app) => {
     auth,
     deployMiddle,
     controller.deploy.deleteFile
+  );
+
+  // 远程文件管理
+  router.get(
+    "/deploy/remote-files",
+    auth,
+    deployMiddle,
+    controller.deploy.getRemoteFiles
+  );
+  router.get(
+    "/deploy/remote-download",
+    auth,
+    deployMiddle,
+    controller.deploy.downloadRemoteFile
   );
 
   // {服务器名字:'host,password'}

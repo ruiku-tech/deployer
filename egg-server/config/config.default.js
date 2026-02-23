@@ -53,7 +53,7 @@ module.exports = (appInfo) => {
     whitelist: () => true,
   };
   config.websocket = {
-    path: "/ws",
+    // 不限制路径，允许多个WebSocket路由
   };
   config.mongoose = {
     client: {

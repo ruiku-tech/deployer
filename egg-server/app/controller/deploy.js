@@ -231,6 +231,68 @@ class DeployController extends Controller {
       ctx.body = { err };
     }
   }
+
+  // 获取远程服务器文件列表
+  async getRemoteFiles(ctx) {
+    const { request: req } = ctx;
+    const { serverName, path: remotePath } = req.query;
+
+    if (!serverName || !remotePath) {
+      ctx.status = 400;
+      ctx.body = { err: '缺少必要参数' };
+      return;
+    }
+
+    try {
+      const env = req.headers.env || 'dsc';
+      const files = await ctx.service.remote.listFiles(
+        serverName,
+        remotePath,
+        env
+      );
+      ctx.body = { data: files };
+    } catch (err) {
+      console.error('获取远程文件列表失败:', err);
+      ctx.status = 500;
+      ctx.body = { err: err.message };
+    }
+  }
+
+  // 下载远程服务器文件
+  async downloadRemoteFile(ctx) {
+    const { request: req } = ctx;
+    const { serverName, filePath } = req.query;
+
+    if (!serverName || !filePath) {
+      ctx.status = 400;
+      ctx.body = { message: '缺少必要参数' };
+      return;
+    }
+
+    try {
+      const env = req.headers.env || 'dsc';
+      const fileStream = await ctx.service.remote.downloadFile(
+        serverName,
+        filePath,
+        env
+      );
+
+      // 获取文件名
+      const fileName = path.basename(filePath);
+
+      // 设置响应头
+      ctx.set('Content-Type', 'application/octet-stream');
+      ctx.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+
+      // 返回文件流
+      ctx.body = fileStream;
+    } catch (err) {
+      console.error('下载远程文件失败:', err);
+      ctx.status = 500;
+      ctx.body = { message: '下载文件失败: ' + err.message };
+    }
+  }
+
   // {服务器名字:'host,password'}
   // 获取服务器列表
   async getHosts(ctx) {

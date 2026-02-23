@@ -3,7 +3,7 @@
     <div class="panel">
       <div class="title">执行</div>
       <el-alert
-        title="run:执行;put:上传文件;get:下载文件;rquery:查询并存储到寄存器;spush:寄存器存入堆栈;spop:堆栈出栈给寄存器;reval:执行js代码(当前寄存器的值作为入参，变量名为$)并将返回值存储到寄存器;update:更新变量，格式为xxx=$[0];每一个执行语句可通过$[n]获取堆栈的第n个数据，索引从栈顶开始算"
+        title="run:执行;put:上传文件;get:/root/a.txt,/var/deployer-tmp/a.txt下载文件;rquery:查询并存储到寄存器;spush:寄存器存入堆栈;spop:堆栈出栈给寄存器;reval:执行js代码(当前寄存器的值作为入参，变量名为$)并将返回值存储到寄存器;update:更新变量，格式为xxx=$[0];每一个执行语句可通过$[n]获取堆栈的第n个数据，索引从栈顶开始算"
         type="info"
       />
       <el-form ref="formRef" :model="form" label-width="120px">

@@ -63,6 +63,12 @@ service.interceptors.response.use(
     if (!response.config.headers.nofeel) {
       endLoad();
     }
+    
+    // 对于blob类型的响应，直接返回完整的response对象
+    if (response.config.responseType === 'blob') {
+      return response;
+    }
+    
     const data = response.data;
 
     if (data.err) {

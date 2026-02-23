@@ -42,7 +42,7 @@
         <el-table-column prop="host" label="IP" width="200" />
         <el-table-column prop="password" label="密码/密钥" width="200" />
         <el-table-column prop="port" label="端口" width="80" />
-        <el-table-column label="操作" width="120">
+        <el-table-column label="操作" width="240">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="edit(scope.row)"
               >修改</el-button
@@ -50,10 +50,18 @@
             <el-button link type="primary" size="small" @click="del(scope.row)"
               >删除</el-button
             >
+            <el-button link type="success" size="small" @click="openTerminal(scope.row)"
+              >终端</el-button
+            >
+            <el-button link type="warning" size="small" @click="openFileBrowser(scope.row)"
+              >下载</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
     </el-card>
+    <Terminal ref="terminalRef" />
+    <RemoteFileBrowser ref="fileBrowserRef" />
   </div>
 </template>
 
@@ -61,9 +69,15 @@
 import { fetchHosts, saveHosts, deleteHosts } from "../api";
 import { ElMessage } from "element-plus";
 import { confirmDelete } from "../utils";
+import Terminal from "./Terminal.vue";
+import RemoteFileBrowser from "./RemoteFileBrowser.vue";
 
 export default {
   name: "host",
+  components: {
+    Terminal,
+    RemoteFileBrowser,
+  },
   data() {
     return {
       list: [],
@@ -135,6 +149,17 @@ export default {
       console.log(data);
 
       return saveHosts(data).then(this.fresh);
+    },
+    openTerminal(item) {
+      // 只传递服务器名称，后端自己读取密码
+      this.$refs.terminalRef.open({
+        name: item.name,
+        host: item.host,
+        port: item.port
+      });
+    },
+    openFileBrowser(item) {
+      this.$refs.fileBrowserRef.open(item);
     },
   },
 };
