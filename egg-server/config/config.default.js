@@ -62,7 +62,6 @@ module.exports = (appInfo) => {
       // url: 'mongodb://43.132.219.112:33017/server_database',
       // url: "mongodb://43.154.9.221:30001/deployer",
       options: {
-        useUnifiedTopology: true,
         serverSelectionTimeoutMS: 50000, // 增加服务器选择超时
         connectTimeoutMS: 100000, // 增加连接超时
       },

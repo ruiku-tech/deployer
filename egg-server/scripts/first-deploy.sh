@@ -11,14 +11,12 @@ docker run -d -p 33017:27017 --name mongo-deploy --restart always mongo:4.4
 
 yum install -y unzip
 
-#curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
-curl -sL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+#curl -sL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo yum install -y nodejs
 #sudo yum install -y npm
 
-TOKEN=$GHTOKEN
-
-LATEST_RELEASE_INFO=$(curl -H "Authorization: token $TOKEN" -s "https://api.github.com/repos/ruiku-tech/deployer/releases/latest")
+LATEST_RELEASE_INFO=$(curl -s "https://api.github.com/repos/ruiku-tech/deployer/releases/latest")
 
 DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | grep "browser_download_url" | grep "release.zip" | head -n 1 | cut -d '"' -f 4)
 
