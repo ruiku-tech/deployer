@@ -33,6 +33,10 @@ export function historyDelete(text) {
   return service.post("/script/delete", { text });
 }
 
-export function selfUpdate(token) {
-  return service.post("/selfupdate", { token });
+export function selfUpdate() {
+  return service.post("/selfupdate");
+}
+
+export function getVersionInfo() {
+  return service.get("/version");
 }

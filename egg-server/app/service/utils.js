@@ -30,18 +30,33 @@ function parseHosts() {
   }, {});
 }
 
-function selfUpdate(token) {
-  console.log("path", path.resolve(__dirname, "..", ".."));
-  // 运行 npm 命令
+function selfUpdate() {
+  console.log("开始自动升级，项目路径:", path.resolve(__dirname, "..", ".."));
+  // 运行 npm 命令，仓库现在是公开的，无需token
+  // 使用 detached: true 和 unref() 确保子进程完全独立，不会因父进程终止而终止
   const npmProcess = spawn("npm", ["run", "upgrade"], {
     cwd: path.resolve(__dirname, "..", ".."),
-    env: { GHTOKEN: token, ...process.env },
-    detached: true, // 使子进程与父进程分离
-    stdio: "ignore", // 不需要与父进程交互
+    env: process.env,
+    detached: true, // 使子进程与父进程分离，即使父进程终止，子进程也会继续运行
+    stdio: "ignore", // 完全忽略输入输出，断开与父进程的所有连接
   });
 
-  // 使子进程脱离父进程
+  // 使子进程脱离父进程的引用，父进程不会等待子进程
   npmProcess.unref();
+  console.log("升级进程已启动，子进程 PID:", npmProcess.pid);
+}
+
+// 获取当前版本
+function getCurrentVersion() {
+  try {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, "..", "..", "package.json"), "utf-8")
+    );
+    return packageJson.version || "未知版本";
+  } catch (error) {
+    console.error("读取版本号失败:", error);
+    return "未知版本";
+  }
 }
 
 module.exports = {
@@ -49,4 +64,5 @@ module.exports = {
   saveVars,
   parseHosts,
   selfUpdate,
+  getCurrentVersion,
 };

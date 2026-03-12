@@ -26,7 +26,7 @@
 </template>
 
 <script>
-import { getDeployings, stopDeploy, selfUpdate } from "../api";
+import { getDeployings, stopDeploy, selfUpdate, getVersionInfo } from "../api";
 import dataCenter from "../dataCenter";
 import { confirmDelete } from "../utils";
 import dayjs from "dayjs";
@@ -71,19 +71,90 @@ export default {
       if (e.ctrlKey && e.code === "KeyL") {
         this.logger.innerHTML = "";
       } else if (e.ctrlKey && e.code === "KeyU") {
-        ElMessageBox.prompt("输入更新token", "提示", {
-          confirmButtonText: "OK",
-          cancelButtonText: "Cancel",
-        })
-          .then(({ value }) => {
-            selfUpdate(value).then((resp) => {
+        // 先获取版本信息
+        getVersionInfo()
+          .then((response) => {
+            const versionInfo = response?.data || {};
+            const currentVersion = versionInfo.currentVersion || "未知";
+            const latestVersion = versionInfo.latestVersion || "未知";
+            const releaseNotes = versionInfo.releaseNotes || "";
+            
+            // 构建确认消息
+            let message = `当前版本: ${currentVersion}\n最新版本: ${latestVersion}\n\n`;
+            
+            if (currentVersion === latestVersion) {
+              message += "已是最新版本，是否仍要重新安装？";
+            } else {
+              message += "升级过程中服务会短暂重启，是否继续？";
+            }
+            
+            if (releaseNotes && releaseNotes !== "暂无更新说明") {
+              // 截取前200个字符作为预览
+              const preview = releaseNotes.length > 200 
+                ? releaseNotes.substring(0, 200) + "..."
+                : releaseNotes;
+              message += `\n\n更新说明:\n${preview}`;
+            }
+
+            return ElMessageBox.confirm(message, "自动升级确认", {
+              confirmButtonText: "确定升级",
+              cancelButtonText: "取消",
+              type: "warning",
+              customClass: "version-confirm-dialog",
+            });
+          })
+          .then(() => {
+            // 用户确认升级
+            selfUpdate().then((resp) => {
               ElMessage({
                 type: "success",
-                message: `命令已启动`,
+                message: resp?.data || "升级进程已启动，服务将在几分钟内自动重启",
+                duration: 5000,
+              });
+            }).catch((error) => {
+              ElMessage({
+                type: "error",
+                message: error?.response?.data?.err || "升级启动失败",
               });
             });
           })
-          .catch(() => {});
+          .catch((error) => {
+            if (error === "cancel") {
+              ElMessage({
+                type: "info",
+                message: "已取消升级",
+              });
+            } else if (error?.response) {
+              // 获取版本信息失败，但仍然提供升级选项
+              ElMessageBox.confirm(
+                "无法获取版本信息，是否仍要继续升级？\n\n升级过程中服务会短暂重启。",
+                "自动升级确认",
+                {
+                  confirmButtonText: "确定升级",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              ).then(() => {
+                selfUpdate().then((resp) => {
+                  ElMessage({
+                    type: "success",
+                    message: resp?.data || "升级进程已启动",
+                    duration: 5000,
+                  });
+                }).catch((error) => {
+                  ElMessage({
+                    type: "error",
+                    message: error?.response?.data?.err || "升级启动失败",
+                  });
+                });
+              }).catch(() => {
+                ElMessage({
+                  type: "info",
+                  message: "已取消升级",
+                });
+              });
+            }
+          });
       }
     },
     connect() {
@@ -192,5 +263,17 @@ export default {
 
 #logger .NORM {
   color: #0e0;
+}
+
+/* 版本确认对话框样式 */
+:deep(.version-confirm-dialog) {
+  width: 500px;
+}
+
+:deep(.version-confirm-dialog .el-message-box__message) {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  line-height: 1.6;
 }
 </style>

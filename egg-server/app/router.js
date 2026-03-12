@@ -194,6 +194,8 @@ module.exports = (app) => {
   router.post("/deploy/login", controller.deploy.postLogin);
   // 自更新
   router.post("/deploy/selfupdate", auth, controller.deploy.selfUpdate);
+  // 获取版本信息
+  router.get("/deploy/version", auth, controller.deploy.getVersionInfo);
   // 记录列表
   router.get(
     "/deploy/recordList",

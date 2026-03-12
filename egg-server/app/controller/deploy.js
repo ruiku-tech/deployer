@@ -899,12 +899,46 @@ class DeployController extends Controller {
   }
 
   async selfUpdate(ctx) {
-    const token = ctx.request.body.token;
-    if (token) {
-      utils.selfUpdate(token);
-      ctx.body = { data: "sccess" };
-    } else {
-      ctx.body = { err: "token为空" };
+    try {
+      utils.selfUpdate();
+      ctx.body = { 
+        data: "升级进程已启动，服务将在几分钟内自动重启" 
+      };
+    } catch (error) {
+      console.error("启动升级失败:", error);
+      ctx.body = { err: "启动升级失败: " + error.message };
+    }
+  }
+
+  // 获取版本信息
+  async getVersionInfo(ctx) {
+    const axios = require("axios");
+    const currentVersion = utils.getCurrentVersion();
+    
+    try {
+      // 获取 GitHub 最新版本
+      const response = await axios.get(
+        "https://api.github.com/repos/ruiku-tech/deployer/releases/latest"
+      );
+      
+      ctx.body = {
+        data: {
+          currentVersion,
+          latestVersion: response.data.tag_name || "未知",
+          latestVersionName: response.data.name || "最新版本",
+          publishedAt: response.data.published_at,
+          releaseNotes: response.data.body || "暂无更新说明",
+        }
+      };
+    } catch (error) {
+      console.error("获取最新版本失败:", error.message);
+      ctx.body = {
+        data: {
+          currentVersion,
+          latestVersion: "获取失败",
+          error: error.message,
+        }
+      };
     }
   }
 }
