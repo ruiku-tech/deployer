@@ -61,8 +61,9 @@ export function confirmClone(options=[]) {
 }
 export function prodConfirm() {
   const env = dataCenter.env.value;
-  const isTest = env.includes("test") || env.includes("dev");
-  if (isTest) {
+  // 只有包含prod字符串（忽略大小写）才会提示倒计时的部署
+  const isProd = /prod/i.test(env);
+  if (!isProd) {
     return Promise.resolve();
   }
   return new Promise((resolve, reject) => {

@@ -60,8 +60,18 @@
         </el-table-column>
       </el-table>
     </el-card>
-    <Terminal ref="terminalRef" />
     <RemoteFileBrowser ref="fileBrowserRef" />
+    <!-- 多终端管理 -->
+    <DraggableTerminal
+      v-for="terminal in terminals"
+      :key="terminal.id"
+      :hostInfo="terminal.hostInfo"
+      :initialPosition="terminal.position"
+      :zIndex="terminal.zIndex"
+      @close="closeTerminal(terminal.id)"
+      @bring-to-front="bringToFront(terminal.id)"
+      ref="terminalRefs"
+    />
   </div>
 </template>
 
@@ -69,13 +79,13 @@
 import { fetchHosts, saveHosts, deleteHosts } from "../api";
 import { ElMessage } from "element-plus";
 import { confirmDelete } from "../utils";
-import Terminal from "./Terminal.vue";
+import DraggableTerminal from "./DraggableTerminal.vue";
 import RemoteFileBrowser from "./RemoteFileBrowser.vue";
 
 export default {
   name: "host",
   components: {
-    Terminal,
+    DraggableTerminal,
     RemoteFileBrowser,
   },
   data() {
@@ -88,6 +98,9 @@ export default {
         password: "",
       },
       collapse: [],
+      terminals: [],
+      nextTerminalId: 1,
+      maxZIndex: 1000,
     };
   },
   mounted() {
@@ -151,12 +164,64 @@ export default {
       return saveHosts(data).then(this.fresh);
     },
     openTerminal(item) {
-      // 只传递服务器名称，后端自己读取密码
-      this.$refs.terminalRef.open({
-        name: item.name,
-        host: item.host,
-        port: item.port
+      // 检查是否已经打开了相同服务器的终端
+      const existingTerminal = this.terminals.find(
+        t => t.hostInfo.name === item.name && t.hostInfo.host === item.host
+      );
+      
+      if (existingTerminal) {
+        // 如果已经打开，则将其置顶
+        this.bringToFront(existingTerminal.id);
+        // 显示终端（如果被最小化）
+        const terminalRef = this.$refs.terminalRefs?.find(
+          ref => ref.hostInfo.name === item.name
+        );
+        if (terminalRef && !terminalRef.visible) {
+          terminalRef.visible = true;
+        }
+        return;
+      }
+
+      // 创建新终端
+      const id = this.nextTerminalId++;
+      const terminalCount = this.terminals.length;
+      const offset = terminalCount * 30; // 每个新终端偏移30px
+      
+      const terminal = {
+        id,
+        hostInfo: {
+          name: item.name,
+          host: item.host,
+          port: item.port
+        },
+        position: {
+          x: 100 + offset,
+          y: 100 + offset
+        },
+        zIndex: ++this.maxZIndex
+      };
+      
+      this.terminals.push(terminal);
+      
+      // 等待组件渲染后打开终端
+      this.$nextTick(() => {
+        const terminalRef = this.$refs.terminalRefs?.[this.terminals.length - 1];
+        if (terminalRef) {
+          terminalRef.open();
+        }
       });
+    },
+    closeTerminal(id) {
+      const index = this.terminals.findIndex(t => t.id === id);
+      if (index > -1) {
+        this.terminals.splice(index, 1);
+      }
+    },
+    bringToFront(id) {
+      const terminal = this.terminals.find(t => t.id === id);
+      if (terminal) {
+        terminal.zIndex = ++this.maxZIndex;
+      }
     },
     openFileBrowser(item) {
       this.$refs.fileBrowserRef.open(item);

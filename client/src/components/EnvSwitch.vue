@@ -61,11 +61,11 @@ export default {
     },
     cloneEnv() {
       ElMessageBox.prompt(
-        "请输入新环境名字(只能由英文和数字组成)",
+        "请输入新环境名字(只能由英文、数字、下划线和中划线组成)",
         "克隆环境",
         {
-          inputPattern: /^[a-zA-Z0-9]+$/,
-          inputErrorMessage: "只能由英文和数字组成",
+          inputPattern: /^[a-zA-Z0-9_-]+$/,
+          inputErrorMessage: "只能由英文、数字、下划线和中划线组成",
         }
       ).then(({ value }) => {
         if (this.list.find((item) => item.name === value)) {
@@ -77,11 +77,11 @@ export default {
     },
     createEnv() {
       ElMessageBox.prompt(
-        "请输入新环境名字(只能由英文和数字组成)",
+        "请输入新环境名字(只能由英文、数字、下划线和中划线组成)",
         "创建环境",
         {
-          inputPattern: /^[a-zA-Z0-9]+$/,
-          inputErrorMessage: "只能由英文和数字组成",
+          inputPattern: /^[a-zA-Z0-9_-]+$/,
+          inputErrorMessage: "只能由英文、数字、下划线和中划线组成",
         }
       ).then(({ value }) => {
         if (this.list.find((item) => item.name === value)) {

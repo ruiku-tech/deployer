@@ -658,8 +658,28 @@ class DeployController extends Controller {
       username: ctx.state.user.username,
       time: Date.now(),
     });
+    
+    // 解析脚本：将脚本名转换为命令数组
+    const vars = utils.parseVars.call(req.context);
+    const env = req.headers.env || 'default';
+    const context = Object.assign(
+      { vars, hosts },
+      req.context
+    );
+    
+    const list = ctx.service.executer.parse(env, context, [{
+      host: req.body.server,
+      cmds: [req.body.cmd]
+    }]);
+    
+    // 检查解析错误
+    if (list[0]?.err) {
+      return (ctx.body = { err: list[0].err });
+    }
+    
+    // 执行已解析的命令
     await ctx.service.executer
-      .run(server, req.body.cmd)
+      .deply(list[0])
       .then(() => {
         ctx.body = { data: "success" };
       })
