@@ -40,3 +40,13 @@ export function selfUpdate() {
 export function getVersionInfo() {
   return service.get("/version");
 }
+
+// 迁移：获取迁移状态
+export function getMigrateStatus() {
+  return service.get("/migrate/status");
+}
+
+// 迁移：执行 MongoDB 到 SQLite 迁移
+export function postMigrate(mongoUrl) {
+  return service.post("/migrate", { mongoUrl });
+}

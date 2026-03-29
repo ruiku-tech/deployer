@@ -270,7 +270,7 @@ class ExecuterService extends Service {
     utils.saveVars(vars);
   }
 
-  // [{name:string,host:string,cmds:string[]}]
+  // list:[{name:string,host:string,cmds:string[]}],cmds是文件名字
   parse(env, content, list) {
     this.env = env;
     this.content = content;
@@ -304,6 +304,41 @@ class ExecuterService extends Service {
       return { server, cmds: cmds.filter((cmd) => cmd) };
     });
   }
+  /** 直接提供给其他那里调用的，直接输入的cmd，而非cmd文件
+   * list:[{name:string,host:string,cmds:string[]}]
+   * cmds是具体命令字符串
+   */
+  parseSingleCmds(env, content, list) {
+    this.env = env;
+    this.content = content;
+    // 总的变量配置
+    const vars = this.content.vars;
+    // 总的服务器配置
+    const hosts = this.content.hosts;
+    return list.map((item, index) => {
+      const server = hosts[item.host];
+      if (!server) {
+        return { err: `第${index + 1}个配置,找不到服务器[${item.host}]配置` };
+      }
+      const cmds = [];
+      for (let i = 0; i < item.cmds.length; i++) {
+        let scriptContent = item.cmds[i];
+        this.server = server;
+        const ret = this.resolveExpress(scriptContent, {});
+        if (ret.err) {
+          return ret;
+        }
+        scriptContent = ret.data;
+        cmds.push(
+          ...scriptContent
+            .split("\n")
+            .filter((line) => !line.trim().startsWith("#"))
+        );
+      }
+      return { server, cmds: cmds.filter((cmd) => cmd) };
+    });
+  }
+  
   genConn(host, password, port) {
     let item = deploying.find((item) => item.host === host);
     if (!item) {

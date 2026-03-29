@@ -83,6 +83,7 @@
       <div class="title">退出登陆</div>
       <el-button type="primary" @click="logOut()">退出</el-button>
     </div>
+
   </div>
   <el-drawer
     v-model="drawer"
@@ -142,6 +143,7 @@ export default {
       checked: true,
       drawer: false,
       anchorData: [],
+
     };
   },
   mounted() {
@@ -230,6 +232,7 @@ export default {
       localStorage.removeItem("token");
       dataCenter.token.value = "";
     },
+
   },
 };
 </script>

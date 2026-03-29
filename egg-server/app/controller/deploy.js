@@ -9,8 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const config = require("../service/config");
 const pump = require("mz-modules/pump");
-const fileMemo = require("../model/FileMemo");
-const scriptRecord = require("../model/ScriptRecord");
+const database = require("../service/database");
 const speakeasy = require("speakeasy");
 const userFile = config.userFile();
 const storage = multer.diskStorage({
@@ -100,11 +99,9 @@ class DeployController extends Controller {
       const memos = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileMemos = await fileMemo
-          .findOne({ fileName: file })
-          .sort({ uploadTime: -1 });
-        if (fileMemos) {
-          memos[i] = fileMemos.memo;
+        const fileMemoRow = database.findOneFileMemo(file);
+        if (fileMemoRow) {
+          memos[i] = fileMemoRow.memo;
         } else {
           memos[i] = "";
         }
@@ -141,11 +138,10 @@ class DeployController extends Controller {
     // 使用 pump 将文件流传输到写流
     await pump(stream, writeStream);
     try {
-      const fileDocument = new fileMemo({ fileName, memo });
-      await fileDocument.save();
+      database.createFileMemo({ fileName, memo });
     } catch (err) {
-      console.error("Error saving file to MongoDB:", err);
-      ctx.throw(500, "Error saving file to MongoDB");
+      console.error("Error saving file memo:", err);
+      ctx.throw(500, "Error saving file memo");
     }
 
     // 删除老的三个文件
@@ -615,7 +611,7 @@ class DeployController extends Controller {
     //   'utf-8',
     //   () => {}
     // );
-    const user = await ctx.model.Record.create(recordList);
+    const user = database.createRecords(recordList);
     try {
       ctx.service.executer.deployList(list);
       ctx.body = { data: user };
@@ -626,7 +622,7 @@ class DeployController extends Controller {
   async scriptDetail(ctx) {
     const { request: req, response: res } = ctx;
     // 查询文档并按时间倒序排序，进行分页
-    const scripts = await scriptRecord.find().sort({ uploadTime: -1 }); // 按 uploadTime 倒序排序
+    const scripts = database.findScriptRecords();
 
     // 获取总文档数量，用于计算总页数
     // const totalDocuments = await fileDocument.countDocuments();
@@ -635,7 +631,7 @@ class DeployController extends Controller {
   }
   async scriptDelete(ctx) {
     const { request: req, response: res } = ctx;
-    await scriptRecord.deleteOne({ text: req.body.text });
+    database.deleteScriptRecord(req.body.text);
     ctx.body = { data: "success" };
   }
 
@@ -648,10 +644,9 @@ class DeployController extends Controller {
     }
     const text = req.body.cmd;
     if (req.body.cache) {
-      const fileDocument = new scriptRecord({ text });
-      fileDocument.save().catch(() => {});
+      try { database.createScriptRecord({ text }); } catch(e) {}
     }
-    ctx.model.Record.create({
+    database.createRecord({
       cmds: [req.body.cmd],
       host: req.body.server,
       name: "~运行~",
@@ -667,7 +662,7 @@ class DeployController extends Controller {
       req.context
     );
     
-    const list = ctx.service.executer.parse(env, context, [{
+    const list = ctx.service.executer.parseSingleCmds(env, context, [{
       host: req.body.server,
       cmds: [req.body.cmd]
     }]);
@@ -754,19 +749,17 @@ class DeployController extends Controller {
     if (!verified) {
       return (ctx.body = { err: { code: "code码错误" } });
     }
-    const jsonData = await ctx.model.User.find({
-      username: req.body.username,
-    });
+    const jsonData = database.findUsers({ username: req.body.username });
     if (jsonData.length > 0) {
       return (ctx.body = { err: { code: "用户名已注册" } });
     }
 
     try {
-      await ctx.model.User.create({
+      database.createUser({
         username: req.body.username,
         password: req.body.password,
       });
-      await ctx.model.Record.create({
+      database.createRecord({
         cmds: [],
         host: req.ip,
         name: "注册",
@@ -782,7 +775,7 @@ class DeployController extends Controller {
   async postLogin(ctx) {
     const { request: req, response: res } = ctx;
     try {
-      const users = await ctx.model.User.find({
+      const users = database.findUsers({
         username: req.body.username,
         password: req.body.password,
       });
@@ -792,7 +785,7 @@ class DeployController extends Controller {
           ctx.app.config.jwt.secret,
           { expiresIn: ctx.app.config.jwt.expiresIn }
         );
-        await ctx.model.Record.create({
+        database.createRecord({
           cmds: [],
           host: req.ip,
           name: "登录",
@@ -813,11 +806,8 @@ class DeployController extends Controller {
     const page = req.query.page || 1;
     const pageSize = req.query.pageSize || 30;
     try {
-      const records = await ctx.model.Record.find()
-        .sort({ time: -1 })
-        .skip((page - 1) * pageSize)
-        .limit(pageSize);
-      const total = await ctx.model.Record.countDocuments();
+      const records = database.findRecords({ page: Number(page), pageSize: Number(pageSize) });
+      const total = database.countRecords();
       ctx.body = { data: { list: records, page, total } };
     } catch (err) {
       ctx.body = { data: "暂无记录" };
@@ -826,8 +816,8 @@ class DeployController extends Controller {
   // 删除记录数据
   async postRecordDelete(ctx) {
     const { request: req, response: res } = ctx;
-    const result = await ctx.model.Record.deleteOne(req.body.item);
-    if (result.deletedCount === 1) {
+    const result = database.deleteRecord(req.body.item);
+    if (result.changes >= 1) {
       ctx.body = { data: "success" };
     } else {
       ctx.body = { err: { code: "删除失败" } };
@@ -939,6 +929,115 @@ class DeployController extends Controller {
           error: error.message,
         }
       };
+    }
+  }
+
+  // 获取迁移状态
+  async getMigrateStatus(ctx) {
+    const currentVersion = utils.getCurrentVersion();
+    const migrated = database.isMigrated();
+    ctx.body = {
+      data: {
+        currentVersion,
+        migrated,
+        needMigration: !migrated,
+      }
+    };
+  }
+
+  // 执行 MongoDB 到 SQLite 的数据迁移
+  async postMigrate(ctx) {
+    const { request: req } = ctx;
+    const mongoUrl = req.body.mongoUrl;
+
+    if (!mongoUrl) {
+      ctx.status = 400;
+      ctx.body = { err: '请提供 MongoDB 连接地址' };
+      return;
+    }
+
+    if (database.isMigrated()) {
+      ctx.body = { data: '数据已迁移过，无需重复迁移' };
+      return;
+    }
+
+    let mongoose;
+    try {
+      mongoose = require('mongoose');
+    } catch (e) {
+      ctx.status = 500;
+      ctx.body = { err: 'mongoose 未安装，请先运行: npm install mongoose' };
+      return;
+    }
+
+    let conn;
+    try {
+      // 连接到 MongoDB
+      conn = await mongoose.createConnection(mongoUrl, {
+        serverSelectionTimeoutMS: 15000,
+        connectTimeoutMS: 30000,
+      }).asPromise();
+
+      // 定义 Schema
+      const UserSchema = new mongoose.Schema({
+        username: String,
+        password: String,
+      });
+      const RecordSchema = new mongoose.Schema({
+        cmds: [String],
+        host: String,
+        name: String,
+        username: String,
+        time: Date,
+      });
+      const FileMemoSchema = new mongoose.Schema({
+        fileName: String,
+        memo: String,
+        uploadTime: Date,
+      });
+      const ScriptRecordSchema = new mongoose.Schema({
+        text: String,
+        uploadTime: Date,
+      });
+
+      const UserModel = conn.model('User', UserSchema);
+      const RecordModel = conn.model('Record', RecordSchema);
+      const FileMemoModel = conn.model('FileMemo', FileMemoSchema);
+      const ScriptRecordModel = conn.model('script_history', ScriptRecordSchema);
+
+      // 读取所有数据
+      const users = await UserModel.find({}).lean();
+      const records = await RecordModel.find({}).lean();
+      const fileMemos = await FileMemoModel.find({}).lean();
+      const scriptRecords = await ScriptRecordModel.find({}).lean();
+
+      // 导入到 SQLite
+      database.importMigrationData({
+        users,
+        records,
+        fileMemos,
+        scriptRecords,
+      });
+
+      ctx.body = {
+        data: {
+          message: '迁移成功',
+          stats: {
+            users: users.length,
+            records: records.length,
+            fileMemos: fileMemos.length,
+            scriptRecords: scriptRecords.length,
+          }
+        }
+      };
+    } catch (err) {
+      console.error('迁移失败:', err);
+      ctx.status = 500;
+      ctx.body = { err: '迁移失败: ' + (err.message || String(err)) };
+    } finally {
+      if (conn) {
+        try { await conn.close(); } catch (e) {}
+      }
     }
   }
 }

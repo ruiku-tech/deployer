@@ -2,26 +2,60 @@
   <div class="right">
     <div class="deploying">
       <div class="title">部署中</div>
-      <el-checkbox-group v-model="envList">
-        <el-checkbox-button
-          v-for="env in dataCenter.envList"
-          :label="env"
-          :key="env"
-          >{{ env.name }}</el-checkbox-button
-        >
-      </el-checkbox-group>
-      <div class="list">
-        <el-tag
-          v-for="deploying in deployings"
-          :key="deploying"
-          closable
-          @close="stop(deploying)"
-        >
-          {{ deploying }}
-        </el-tag>
-      </div>
+      <el-popover placement="bottom" trigger="click" :width="300">
+        <template #reference>
+          <el-button size="small" style="margin-right: 10px">
+            监听环境 ({{ envList.length }})
+          </el-button>
+        </template>
+        <el-checkbox-group v-model="envList" style="display: flex; flex-direction: column">
+          <el-checkbox
+            v-for="env in dataCenter.envList"
+            :label="env"
+            :key="env.name"
+            style="margin: 5px 0"
+          >
+            {{ env.name }}
+          </el-checkbox>
+        </el-checkbox-group>
+      </el-popover>
+      <el-popover placement="bottom" trigger="click" :width="300">
+        <template #reference>
+          <el-button size="small" type="info">
+            活动连接 ({{ deployings.length }})
+          </el-button>
+        </template>
+        <div style="display: flex; flex-direction: column; gap: 5px">
+          <el-button
+            v-for="deploying in deployings"
+            :key="deploying"
+            size="small"
+            type="danger"
+            plain
+            @click="stop(deploying)"
+          >
+            {{ deploying }} (点击停止)
+          </el-button>
+          <div v-if="deployings.length === 0" style="color: #999; text-align: center; padding: 10px">
+            暂无活动连接
+          </div>
+        </div>
+      </el-popover>
     </div>
-    <div id="logger"></div>
+    <div id="logger" @contextmenu.prevent="showContextMenu"></div>
+    <!-- 右键菜单 -->
+    <el-dropdown
+      ref="contextMenu"
+      trigger="contextmenu"
+      :style="{ position: 'fixed', left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px', display: contextMenuVisible ? 'block' : 'none' }"
+    >
+      <span></span>
+      <template #dropdown>
+        <el-dropdown-menu>
+          <el-dropdown-item @click="clearLog">清空日志 (Ctrl+K)</el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
+    </el-dropdown>
   </div>
 </template>
 
@@ -39,6 +73,8 @@ export default {
       deployings: [],
       dataCenter,
       envList: [{ name: dataCenter.env.value }],
+      contextMenuVisible: false,
+      contextMenuPosition: { x: 0, y: 0 },
     };
   },
   mounted() {
@@ -46,7 +82,18 @@ export default {
     this.hearter = 0;
     this.connect();
     document.addEventListener("keyup", this.onKeyUp);
+    document.addEventListener("click", this.hideContextMenu);
     this.loopSyncDeploying();
+  },
+  beforeUnmount() {
+    document.removeEventListener("keyup", this.onKeyUp);
+    document.removeEventListener("click", this.hideContextMenu);
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
+    if (this.hearter) {
+      clearInterval(this.hearter);
+    }
   },
   methods: {
     stop(host) {
@@ -68,8 +115,9 @@ export default {
       }
     },
     onKeyUp(e) {
-      if (e.ctrlKey && e.code === "KeyL") {
-        this.logger.innerHTML = "";
+      // 使用 Ctrl+K 清空日志（更兼容的快捷键）
+      if (e.ctrlKey && e.code === "KeyK") {
+        this.clearLog();
       } else if (e.ctrlKey && e.code === "KeyU") {
         // 先获取版本信息
         getVersionInfo()
@@ -199,6 +247,17 @@ export default {
         this.logger.appendChild(line);
         this.logger.scrollTo(0, this.logger.scrollHeight);
       }
+    },
+    showContextMenu(e) {
+      this.contextMenuPosition = { x: e.pageX, y: e.pageY };
+      this.contextMenuVisible = true;
+    },
+    hideContextMenu() {
+      this.contextMenuVisible = false;
+    },
+    clearLog() {
+      this.logger.innerHTML = "";
+      this.hideContextMenu();
     },
   },
 };

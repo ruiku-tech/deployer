@@ -116,7 +116,7 @@ export default {
               name,
               host: info[0],
               password: info[1],
-              port: info[2] || 22,
+              port: info[2] || '22',
             };
           })
           .sort((a, b) => (a.host === b.host ? 0 : a.host > b.host ? 1 : -1));

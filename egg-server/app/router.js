@@ -1,8 +1,7 @@
 /**
  * @param {Egg.Application} app - egg application
  */
-const mongoose = require("mongoose");
-mongoose.set("debug", true);
+const database = require("./service/database");
 module.exports = (app) => {
   const deployMiddle = app.middleware.deployMiddle();
   const auth = app.middleware.auth();
@@ -216,17 +215,81 @@ module.exports = (app) => {
   router.post("/deploy/env/one", auth, controller.env.postOne);
   // 删除配置
   router.delete("/deploy/env/one", auth, controller.env.deleteOne);
+  // 导出环境配置
+  router.get("/deploy/env/export", auth, controller.env.exportEnv);
+  // 导入环境配置
+  router.post("/deploy/env/import", auth, controller.env.importEnv);
 
-  const { client } = app.config.mongoose;
-  mongoose
-    .connect(client.url, client.options)
-    .then(() => {
-      console.log("MongoDB connected successfully");
-      app.listen(app.config.port, () => {
-        console.log(`Server is running at http://localhost:${app.config.port}`);
-      });
-    })
-    .catch((err) => {
-      console.error("MongoDB connection error:", err);
-    });
+  // 初始化 SQLite 数据库
+  try {
+    database.getDb();
+    console.log("SQLite database initialized successfully");
+
+    // 启动时自动检查：如果数据库没有用户且未迁移过，自动尝试从 MongoDB 迁移
+    const users = database.findUsers();
+    if (users.length === 0 && !database.isMigrated()) {
+      const mongoConfig = app.config.mongoMigrate;
+      const mongoUrl = mongoConfig && mongoConfig.url;
+      if (mongoUrl) {
+        console.log("检测到数据库为空且未迁移，自动尝试从 MongoDB 迁移...");
+        (async () => {
+          let mongoose;
+          try {
+            mongoose = require('mongoose');
+          } catch (e) {
+            console.warn("自动迁移跳过：mongoose 未安装，请手动安装后重启或手动迁移");
+            return;
+          }
+          let conn;
+          try {
+            conn = await mongoose.createConnection(mongoUrl, {
+              serverSelectionTimeoutMS: 15000,
+              connectTimeoutMS: 30000,
+            }).asPromise();
+
+            const UserSchema = new mongoose.Schema({ username: String, password: String });
+            const RecordSchema = new mongoose.Schema({ cmds: [String], host: String, name: String, username: String, time: Date });
+            const FileMemoSchema = new mongoose.Schema({ fileName: String, memo: String, uploadTime: Date });
+            const ScriptRecordSchema = new mongoose.Schema({ text: String, uploadTime: Date });
+
+            const UserModel = conn.model('User', UserSchema);
+            const RecordModel = conn.model('Record', RecordSchema);
+            const FileMemoModel = conn.model('FileMemo', FileMemoSchema);
+            const ScriptRecordModel = conn.model('script_history', ScriptRecordSchema);
+
+            const [mongoUsers, records, fileMemos, scriptRecords] = await Promise.all([
+              UserModel.find({}).lean(),
+              RecordModel.find({}).lean(),
+              FileMemoModel.find({}).lean(),
+              ScriptRecordModel.find({}).lean(),
+            ]);
+
+            if (mongoUsers.length === 0) {
+              console.log("MongoDB 中也没有用户数据，跳过自动迁移");
+              return;
+            }
+
+            database.importMigrationData({
+              users: mongoUsers,
+              records,
+              fileMemos,
+              scriptRecords,
+            });
+
+            console.log(`自动迁移完成: ${mongoUsers.length} 用户, ${records.length} 记录, ${fileMemos.length} 文件备注, ${scriptRecords.length} 脚本记录`);
+          } catch (err) {
+            console.warn("自动迁移失败（MongoDB 可能不可用），可稍后手动迁移:", err.message);
+          } finally {
+            if (conn) {
+              try { await conn.close(); } catch (e) {}
+            }
+          }
+        })();
+      } else {
+        console.log("数据库为空且未配置 mongoMigrate.url，跳过自动迁移");
+      }
+    }
+  } catch (err) {
+    console.error("SQLite database initialization error:", err);
+  }
 };
