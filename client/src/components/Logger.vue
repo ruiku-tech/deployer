@@ -53,21 +53,25 @@
       <template #dropdown>
         <el-dropdown-menu>
           <el-dropdown-item @click="clearLog">清空日志 (Ctrl+K)</el-dropdown-item>
+          <el-dropdown-item @click="updateDialogVisible = true">版本管理 (Ctrl+U)</el-dropdown-item>
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+    <!-- 版本管理弹窗 -->
+    <UpdateDialog v-model="updateDialogVisible" />
   </div>
 </template>
 
 <script>
-import { getDeployings, stopDeploy, selfUpdate, getVersionInfo } from "../api";
+import { getDeployings, stopDeploy } from "../api";
 import dataCenter from "../dataCenter";
 import { confirmDelete } from "../utils";
 import dayjs from "dayjs";
-import { ElMessage, ElMessageBox } from "element-plus";
+import UpdateDialog from "./UpdateDialog.vue";
 
 export default {
   name: "logger",
+  components: { UpdateDialog },
   data() {
     return {
       deployings: [],
@@ -75,6 +79,7 @@ export default {
       envList: [{ name: dataCenter.env.value }],
       contextMenuVisible: false,
       contextMenuPosition: { x: 0, y: 0 },
+      updateDialogVisible: false,
     };
   },
   mounted() {
@@ -115,94 +120,10 @@ export default {
       }
     },
     onKeyUp(e) {
-      // 使用 Ctrl+K 清空日志（更兼容的快捷键）
       if (e.ctrlKey && e.code === "KeyK") {
         this.clearLog();
       } else if (e.ctrlKey && e.code === "KeyU") {
-        // 先获取版本信息
-        getVersionInfo()
-          .then((response) => {
-            const versionInfo = response?.data || {};
-            const currentVersion = versionInfo.currentVersion || "未知";
-            const latestVersion = versionInfo.latestVersion || "未知";
-            const releaseNotes = versionInfo.releaseNotes || "";
-            
-            // 构建确认消息
-            let message = `当前版本: ${currentVersion}\n最新版本: ${latestVersion}\n\n`;
-            
-            if (currentVersion === latestVersion) {
-              message += "已是最新版本，是否仍要重新安装？";
-            } else {
-              message += "升级过程中服务会短暂重启，是否继续？";
-            }
-            
-            if (releaseNotes && releaseNotes !== "暂无更新说明") {
-              // 截取前200个字符作为预览
-              const preview = releaseNotes.length > 200 
-                ? releaseNotes.substring(0, 200) + "..."
-                : releaseNotes;
-              message += `\n\n更新说明:\n${preview}`;
-            }
-
-            return ElMessageBox.confirm(message, "自动升级确认", {
-              confirmButtonText: "确定升级",
-              cancelButtonText: "取消",
-              type: "warning",
-              customClass: "version-confirm-dialog",
-            });
-          })
-          .then(() => {
-            // 用户确认升级
-            selfUpdate().then((resp) => {
-              ElMessage({
-                type: "success",
-                message: resp?.data || "升级进程已启动，服务将在几分钟内自动重启",
-                duration: 5000,
-              });
-            }).catch((error) => {
-              ElMessage({
-                type: "error",
-                message: error?.response?.data?.err || "升级启动失败",
-              });
-            });
-          })
-          .catch((error) => {
-            if (error === "cancel") {
-              ElMessage({
-                type: "info",
-                message: "已取消升级",
-              });
-            } else if (error?.response) {
-              // 获取版本信息失败，但仍然提供升级选项
-              ElMessageBox.confirm(
-                "无法获取版本信息，是否仍要继续升级？\n\n升级过程中服务会短暂重启。",
-                "自动升级确认",
-                {
-                  confirmButtonText: "确定升级",
-                  cancelButtonText: "取消",
-                  type: "warning",
-                }
-              ).then(() => {
-                selfUpdate().then((resp) => {
-                  ElMessage({
-                    type: "success",
-                    message: resp?.data || "升级进程已启动",
-                    duration: 5000,
-                  });
-                }).catch((error) => {
-                  ElMessage({
-                    type: "error",
-                    message: error?.response?.data?.err || "升级启动失败",
-                  });
-                });
-              }).catch(() => {
-                ElMessage({
-                  type: "info",
-                  message: "已取消升级",
-                });
-              });
-            }
-          });
+        this.updateDialogVisible = true;
       }
     },
     connect() {
@@ -324,15 +245,5 @@ export default {
   color: #0e0;
 }
 
-/* 版本确认对话框样式 */
-:deep(.version-confirm-dialog) {
-  width: 500px;
-}
-
-:deep(.version-confirm-dialog .el-message-box__message) {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: monospace;
-  line-height: 1.6;
-}
+/* 版本确认对话框样式（已迁移到 UpdateDialog.vue，保留注释） */
 </style>

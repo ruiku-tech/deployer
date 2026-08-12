@@ -1,106 +1,87 @@
-const fs = require("fs");
-const path = require("path");
-const { exec } = require("child_process");
-const axios = require("axios").default;
+const fs = require('fs');
+const path = require('path');
+const { exec } = require('child_process');
+const axios = require('axios').default;
+const { promisify } = require('util');
 
 /**
  * 自动升级脚本
- * 
- * 安全性说明：
- * 1. 此脚本作为独立的子进程运行（通过 spawn 的 detached: true 选项）
- * 2. 即使父进程（egg 服务）被 npm run stop 终止，此脚本仍会继续运行
- * 3. detached 进程会完全独立于父进程的生命周期
- * 4. stdio: 'ignore' 确保子进程不依赖父进程的输入输出流
- * 5. unref() 让父进程不等待子进程，避免阻塞
- * 
- * 升级流程：
- * 下载 -> 停止服务 -> 解压更新 -> 安装依赖 -> 启动服务
+ *
+ * 升级流程：查询版本 -> 下载 -> 停止服务 -> 解压 -> 安装依赖 -> 启动服务
+ *
+ * 支持通过 UPGRADE_VERSION 环境变量指定版本，不设则升级到最新版。
+ * 示例：UPGRADE_VERSION=v1.2.3 npm run upgrade
  */
 
-const url = "https://api.github.com/repos/ruiku-tech/deployer/releases/latest";
+const execAsync = promisify(exec);
 
-// 配置路径（根据实际部署路径调整）
-const localPath = "/tmp/deployer-release.zip";
-const projectDir = path.resolve(__dirname, "..");
+const projectDir = path.resolve(__dirname, '..');
+const localPath = '/tmp/deployer-release.zip';
+const targetVersion = process.env.UPGRADE_VERSION || '';
 
-console.log("开始自动升级流程...");
-console.log("项目目录:", projectDir);
+const apiUrl = targetVersion
+  ? `https://api.github.com/repos/ruiku-tech/deployer/releases/tags/${targetVersion}`
+  : 'https://api.github.com/repos/ruiku-tech/deployer/releases/latest';
 
-// 仓库现在是公开的，无需token
-axios
-  .get(url)
-  .then((resp) => {
-    const downloadUrl =
-      resp.data.assets.length > 0
-        ? resp.data.assets[0].browser_download_url
-        : null;
-    
-    if (!downloadUrl) {
-      console.log("未找到发布文件");
-      return;
-    }
+async function run() {
+  console.log('开始自动升级流程...');
+  console.log('目标版本:', targetVersion || '最新版本');
+  console.log('项目目录:', projectDir);
 
-    console.log("最新版本:", resp.data.tag_name);
-    console.log("下载地址:", downloadUrl);
-    console.log("正在下载...");
-
-    // 步骤1: 下载发布文件
-    exec(`wget -O ${localPath} ${downloadUrl}`, (error, stdout, stderr) => {
-      if (error) {
-        console.log("下载发布文件失败:", error.message);
-        return;
-      }
-      console.log("下载完成，开始停止服务...");
-
-      // 步骤2: 停止服务
-      exec("npm run stop", { cwd: projectDir }, (error, stdout, stderr) => {
-        if (error) {
-          console.log("停止服务警告:", error.message);
-          // 即使停止失败也继续，可能服务本来就没运行
-        }
-        console.log("服务已停止，开始解压更新文件...");
-
-        // 步骤3: 解压文件（覆盖现有文件）
-        const command = `unzip -o ${localPath} -d ${projectDir}`;
-        exec(command, (error, stdout, stderr) => {
-          if (error) {
-            console.log("解压失败:", error.message);
-            return;
-          }
-          console.log("解压完成，安装依赖...");
-
-          // 步骤4: 安装依赖
-          exec("npm install --production", { cwd: projectDir }, (error, stdout, stderr) => {
-            if (error) {
-              console.log("安装依赖失败:", error.message);
-              // 即使失败也尝试启动
-            }
-            console.log("依赖安装完成，启动服务...");
-
-            // 步骤5: 启动服务
-            exec("npm run start", { cwd: projectDir }, (error, stdout, stderr) => {
-              if (error) {
-                console.log("启动服务失败:", error.message);
-                console.log("请手动执行: cd", projectDir, "&& npm run start");
-                return;
-              }
-              console.log("服务启动成功！");
-              console.log("升级完成，版本:", resp.data.tag_name);
-
-              // 清理下载的zip文件
-              fs.unlink(localPath, (err) => {
-                if (err) console.log("清理临时文件失败", err.message);
-              });
-            });
-          });
-        });
-      });
-    });
-  })
-  .catch((error) => {
-    console.log("升级失败:", error.message);
-    if (error.response) {
-      console.log("响应状态:", error.response.status);
-      console.log("响应数据:", error.response.data);
-    }
+  // 1. 查询 GitHub 版本信息
+  const { data: release } = await axios.get(apiUrl, {
+    headers: { 'User-Agent': 'deployer-app' },
   });
+
+  const downloadUrl = release.assets?.[0]?.browser_download_url;
+  if (!downloadUrl) {
+    throw new Error(`版本 ${release.tag_name} 没有可下载的发布包`);
+  }
+  console.log('目标版本:', release.tag_name);
+  console.log('下载地址:', downloadUrl);
+
+  // 2. 下载发布包
+  console.log('正在下载...');
+  await execAsync(`wget -O "${localPath}" "${downloadUrl}"`);
+  console.log('下载完成');
+
+  // 3. 停止服务（失败不中断，可能服务本来就没运行）
+  console.log('停止服务...');
+  try {
+    await execAsync('npm run stop', { cwd: projectDir });
+  } catch (e) {
+    console.log('停止服务警告（可忽略）:', e.message);
+  }
+
+  // 4. 解压（覆盖现有文件）
+  console.log('解压更新文件...');
+  await execAsync(`unzip -o "${localPath}" -d "${projectDir}"`);
+  console.log('解压完成');
+
+  // 5. 安装依赖（失败不中断，用旧依赖尝试启动）
+  console.log('安装依赖...');
+  try {
+    await execAsync('npm install --production', { cwd: projectDir });
+  } catch (e) {
+    console.log('安装依赖警告（尝试继续启动）:', e.message);
+  }
+
+  // 6. 启动服务
+  console.log('启动服务...');
+  await execAsync('npm run start', { cwd: projectDir });
+  console.log('升级完成，当前版本:', release.tag_name);
+
+  // 7. 清理临时文件
+  await fs.promises.unlink(localPath).catch(err => {
+    console.log('清理临时文件失败:', err.message);
+  });
+}
+
+run().catch(err => {
+  console.error('升级失败:', err.message);
+  if (err.response) {
+    console.error('HTTP 状态:', err.response.status);
+    console.error('响应数据:', JSON.stringify(err.response.data));
+  }
+  process.exit(1);
+});

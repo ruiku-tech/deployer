@@ -30,18 +30,23 @@ function parseHosts() {
   }, {});
 }
 
-function selfUpdate() {
-  console.log("开始自动升级，项目路径:", path.resolve(__dirname, "..", ".."));
-  // 运行 npm 命令，仓库现在是公开的，无需token
-  // 使用 detached: true 和 unref() 确保子进程完全独立，不会因父进程终止而终止
+function selfUpdate(version) {
+  const versionLabel = version || "最新版本";
+  console.log("开始自动升级，目标版本:", versionLabel, "项目路径:", path.resolve(__dirname, "..", ".."));
+
+  // 传入版本号作为环境变量，upgrade.js 会读取并下载指定版本
+  const env = Object.assign({}, process.env);
+  if (version) {
+    env.UPGRADE_VERSION = version;
+  }
+
   const npmProcess = spawn("npm", ["run", "upgrade"], {
     cwd: path.resolve(__dirname, "..", ".."),
-    env: process.env,
-    detached: true, // 使子进程与父进程分离，即使父进程终止，子进程也会继续运行
-    stdio: "ignore", // 完全忽略输入输出，断开与父进程的所有连接
+    env,
+    detached: true,
+    stdio: "ignore",
   });
 
-  // 使子进程脱离父进程的引用，父进程不会等待子进程
   npmProcess.unref();
   console.log("升级进程已启动，子进程 PID:", npmProcess.pid);
 }

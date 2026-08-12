@@ -51,6 +51,11 @@ function initTables() {
   `);
   d.exec('CREATE INDEX IF NOT EXISTS idx_records_time ON records(time DESC)');
 
+  // 兼容旧数据库：添加 env 列（SQLite 不支持 IF NOT EXISTS，用 try/catch）
+  try {
+    d.exec('ALTER TABLE records ADD COLUMN env TEXT NOT NULL DEFAULT \'\'');
+  } catch (e) { /* 列已存在，忽略 */ }
+
   // 文件备注表
   d.exec(`
     CREATE TABLE IF NOT EXISTS file_memos (
@@ -100,42 +105,49 @@ function createUser({ username, password }) {
 
 // ===== Record 操作 =====
 
-function createRecord({ cmds, host, name, username, time }) {
+function createRecord({ cmds, host, name, username, time, env }) {
   const d = getDb();
   const cmdsJson = JSON.stringify(cmds || []);
   const t = typeof time === 'number' ? time : new Date(time).getTime();
   return d.prepare(
-    'INSERT INTO records (cmds, host, name, username, time) VALUES (?, ?, ?, ?, ?)'
-  ).run(cmdsJson, host, name, username, t);
+    'INSERT INTO records (cmds, host, name, username, time, env) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(cmdsJson, host, name, username, t, env || '');
 }
 
-function createRecords(recordList) {
+function createRecords(recordList, env) {
   const d = getDb();
   const insert = d.prepare(
-    'INSERT INTO records (cmds, host, name, username, time) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO records (cmds, host, name, username, time, env) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const insertMany = d.transaction(records => {
     const results = [];
     for (const r of records) {
       const cmdsJson = JSON.stringify(r.cmds || []);
       const t = r.time ? (typeof r.time === 'number' ? r.time : new Date(r.time).getTime()) : Date.now();
-      results.push(insert.run(cmdsJson, r.host, r.name, r.username, t));
+      results.push(insert.run(cmdsJson, r.host, r.name, r.username, t, env || r.env || ''));
     }
     return results;
   });
   return insertMany(recordList);
 }
 
-function findRecords({ page = 1, pageSize = 30 } = {}) {
+function findRecords({ page = 1, pageSize = 30, env } = {}) {
   const d = getDb();
   const offset = (page - 1) * pageSize;
+  if (env) {
+    const rows = d.prepare('SELECT * FROM records WHERE env = ? ORDER BY time DESC LIMIT ? OFFSET ?').all(env, pageSize, offset);
+    return rows.map(r => ({ ...r, cmds: JSON.parse(r.cmds) }));
+  }
   const rows = d.prepare('SELECT * FROM records ORDER BY time DESC LIMIT ? OFFSET ?').all(pageSize, offset);
   // 解析 cmds JSON
   return rows.map(r => ({ ...r, cmds: JSON.parse(r.cmds) }));
 }
 
-function countRecords() {
+function countRecords(env) {
   const d = getDb();
+  if (env) {
+    return d.prepare('SELECT COUNT(*) as count FROM records WHERE env = ?').get(env).count;
+  }
   return d.prepare('SELECT COUNT(*) as count FROM records').get().count;
 }
 

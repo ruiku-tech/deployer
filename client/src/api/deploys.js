@@ -33,12 +33,16 @@ export function historyDelete(text) {
   return service.post("/script/delete", { text });
 }
 
-export function selfUpdate() {
-  return service.post("/selfupdate");
+export function selfUpdate(version) {
+  return service.post("/selfupdate", version ? { version } : {});
 }
 
 export function getVersionInfo() {
   return service.get("/version");
+}
+
+export function getVersions() {
+  return service.get("/versions");
 }
 
 // 迁移：获取迁移状态

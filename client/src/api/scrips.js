@@ -20,3 +20,8 @@ export function deleteScript(name) {
 export function APIRunScript(host, cmd) {
   return service.post("/script/run", { host, cmd });
 }
+
+// 检测脚本在哪些部署编排中被使用
+export function fetchScriptUsage(name) {
+  return service.get(`/script/usage?name=${encodeURIComponent(name)}`);
+}

@@ -56,9 +56,10 @@
                 link
                 type="success"
                 size="small"
+                :loading="downloading === scope.row.name"
                 @click.stop="downloadFile(scope.row)"
               >
-                下载
+                {{ downloading === scope.row.name ? '下载中...' : '下载' }}
               </el-button>
             </template>
           </el-table-column>
@@ -87,6 +88,7 @@ export default {
       currentPath: "/",
       fileList: [],
       loading: false,
+      downloading: "",
     };
   },
   methods: {
@@ -131,15 +133,19 @@ export default {
     },
     downloadFile(file) {
       const filePath = this.joinPath(this.currentPath, file.name);
-      
-      ElMessage.info("开始下载: " + file.name);
-      
+
+      this.downloading = file.name;
+      ElMessage.info(`开始下载: ${file.name}，大文件请耐心等待...`);
+
       downloadRemoteFile(this.hostInfo.name, filePath, file.name)
         .then(() => {
-          ElMessage.success("下载成功");
+          ElMessage.success("下载成功: " + file.name);
         })
         .catch((err) => {
           ElMessage.error("下载失败: " + (err.message || "未知错误"));
+        })
+        .finally(() => {
+          this.downloading = "";
         });
     },
     joinPath(base, name) {

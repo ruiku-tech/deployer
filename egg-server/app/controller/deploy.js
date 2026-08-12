@@ -611,7 +611,7 @@ class DeployController extends Controller {
     //   'utf-8',
     //   () => {}
     // );
-    const user = database.createRecords(recordList);
+    const user = database.createRecords(recordList, env);
     try {
       ctx.service.executer.deployList(list);
       ctx.body = { data: user };
@@ -649,9 +649,10 @@ class DeployController extends Controller {
     database.createRecord({
       cmds: [req.body.cmd],
       host: req.body.server,
-      name: "~运行~",
+      name: '~运行~',
       username: ctx.state.user.username,
       time: Date.now(),
+      env: req.headers.env || '',
     });
     
     // 解析脚本：将脚本名转换为命令数组
@@ -805,9 +806,10 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     const page = req.query.page || 1;
     const pageSize = req.query.pageSize || 30;
+    const env = req.query.env || '';
     try {
-      const records = database.findRecords({ page: Number(page), pageSize: Number(pageSize) });
-      const total = database.countRecords();
+      const records = database.findRecords({ page: Number(page), pageSize: Number(pageSize), env });
+      const total = database.countRecords(env);
       ctx.body = { data: { list: records, page, total } };
     } catch (err) {
       ctx.body = { data: "暂无记录" };
@@ -888,11 +890,45 @@ class DeployController extends Controller {
     ctx.body = { data: "sccess" };
   }
 
+  // 检测脚本在哪些部署编排中被使用
+  async getScriptUsage(ctx) {
+    const { request: req } = ctx;
+    const scriptName = req.query.name;
+    if (!scriptName) {
+      ctx.body = { err: '请提供脚本名称' };
+      return;
+    }
+    try {
+      const batFiles = await readdir(req.context.batDir);
+      const usages = [];
+      for (const batFile of batFiles) {
+        const filePath = path.resolve(req.context.batDir, batFile);
+        try {
+          const data = await readFile(filePath, 'utf-8');
+          const json = JSON.parse(data);
+          for (const [itemName, itemValue] of Object.entries(json)) {
+            if (Array.isArray(itemValue.cmds) && itemValue.cmds.includes(scriptName)) {
+              usages.push({ compose: batFile, item: itemName });
+            }
+          }
+        } catch (e) {
+          // 跳过无法解析的编排文件
+        }
+      }
+      ctx.body = { data: usages };
+    } catch (err) {
+      ctx.body = { err: err.message };
+    }
+  }
+
   async selfUpdate(ctx) {
     try {
-      utils.selfUpdate();
-      ctx.body = { 
-        data: "升级进程已启动，服务将在几分钟内自动重启" 
+      const version = ctx.request.body.version || null;
+      utils.selfUpdate(version);
+      ctx.body = {
+        data: version
+          ? `升级到 ${version} 的进程已启动，服务将在几分钟内自动重启`
+          : "升级进程已启动，服务将在几分钟内自动重启"
       };
     } catch (error) {
       console.error("启动升级失败:", error);
@@ -900,17 +936,45 @@ class DeployController extends Controller {
     }
   }
 
-  // 获取版本信息
+  // 获取最近5个版本列表
+  async getVersions(ctx) {
+    const axios = require("axios");
+    const currentVersion = utils.getCurrentVersion();
+
+    try {
+      const response = await axios.get(
+        "https://api.github.com/repos/ruiku-tech/deployer/releases?per_page=5",
+        { headers: { "User-Agent": "deployer-app" } }
+      );
+
+      const versions = response.data.map((release, index) => ({
+        tag: release.tag_name,
+        name: release.name || release.tag_name,
+        publishedAt: release.published_at,
+        releaseNotes: release.body || "",
+        hasAsset: release.assets && release.assets.length > 0,
+        isLatest: index === 0,
+      }));
+
+      ctx.body = { data: { currentVersion, versions } };
+    } catch (error) {
+      console.error("获取版本列表失败:", error.message);
+      ctx.body = {
+        data: { currentVersion, versions: [], error: error.message }
+      };
+    }
+  }
+
+  // 获取版本信息（保留旧接口兼容）
   async getVersionInfo(ctx) {
     const axios = require("axios");
     const currentVersion = utils.getCurrentVersion();
-    
+
     try {
-      // 获取 GitHub 最新版本
       const response = await axios.get(
         "https://api.github.com/repos/ruiku-tech/deployer/releases/latest"
       );
-      
+
       ctx.body = {
         data: {
           currentVersion,

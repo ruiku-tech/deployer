@@ -7,8 +7,6 @@ sudo yum install -y docker-ce docker-ce-cli containerd.io
 sudo systemctl start docker
 sudo systemctl enable docker
 
-docker run -d -p 33017:27017 --name mongo-deploy --restart always mongo:4.4
-
 yum install -y unzip
 
 curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -

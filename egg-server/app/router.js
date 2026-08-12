@@ -104,10 +104,17 @@ module.exports = (app) => {
     controller.deploy.deleteScript
   );
   router.post(
-    "/deploy/script/run",
+    '/deploy/script/run',
     auth,
     deployMiddle,
     controller.deploy.scriptRun
+  );
+  // 检测脚本使用情况
+  router.get(
+    '/deploy/script/usage',
+    auth,
+    deployMiddle,
+    controller.deploy.getScriptUsage
   );
 
   // 获取编排列表
@@ -195,6 +202,8 @@ module.exports = (app) => {
   router.post("/deploy/selfupdate", auth, controller.deploy.selfUpdate);
   // 获取版本信息
   router.get("/deploy/version", auth, controller.deploy.getVersionInfo);
+  // 获取最近5个版本列表
+  router.get("/deploy/versions", auth, controller.deploy.getVersions);
   // 记录列表
   router.get(
     "/deploy/recordList",
