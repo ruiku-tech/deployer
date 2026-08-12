@@ -40,7 +40,9 @@ function selfUpdate(version) {
     env.UPGRADE_VERSION = version;
   }
 
-  const npmProcess = spawn("npm", ["run", "upgrade"], {
+  // 用 process.execPath 拿到 node 绝对路径，避免 daemon 环境 PATH 里没有 npm/node
+  const upgradePath = path.resolve(__dirname, "..", "..", "scripts", "upgrade.js");
+  const npmProcess = spawn(process.execPath, [upgradePath], {
     cwd: path.resolve(__dirname, "..", ".."),
     env,
     detached: true,

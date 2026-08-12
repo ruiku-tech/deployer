@@ -10,7 +10,7 @@ const { promisify } = require('util');
  * 升级流程：查询版本 -> 下载 -> 停止服务 -> 解压 -> 安装依赖 -> 启动服务
  *
  * 支持通过 UPGRADE_VERSION 环境变量指定版本，不设则升级到最新版。
- * 示例：UPGRADE_VERSION=v1.2.3 npm run upgrade
+ * 示例：UPGRADE_VERSION=v1.2.3 node scripts/upgrade.js
  */
 
 const execAsync = promisify(exec);
@@ -18,6 +18,12 @@ const execAsync = promisify(exec);
 const projectDir = path.resolve(__dirname, '..');
 const localPath = '/tmp/deployer-release.zip';
 const targetVersion = process.env.UPGRADE_VERSION || '';
+
+// 用 process.execPath 拿到 node/npm 绝对路径，不依赖 PATH
+// daemon 环境 PATH 通常不含 nvm/npm，必须用绝对路径
+const nodeBin = process.execPath; // /xxx/bin/node
+const npmBin = path.join(path.dirname(nodeBin), 'npm'); // /xxx/bin/npm
+const eggScripts = path.join(projectDir, 'node_modules', '.bin', 'egg-scripts');
 
 const apiUrl = targetVersion
   ? `https://api.github.com/repos/ruiku-tech/deployer/releases/tags/${targetVersion}`
@@ -27,6 +33,8 @@ async function run() {
   console.log('开始自动升级流程...');
   console.log('目标版本:', targetVersion || '最新版本');
   console.log('项目目录:', projectDir);
+  console.log('node:', nodeBin);
+  console.log('npm:', npmBin);
 
   // 1. 查询 GitHub 版本信息
   const { data: release } = await axios.get(apiUrl, {
@@ -48,7 +56,7 @@ async function run() {
   // 3. 停止服务（失败不中断，可能服务本来就没运行）
   console.log('停止服务...');
   try {
-    await execAsync('npm run stop', { cwd: projectDir });
+    await execAsync(`"${nodeBin}" "${eggScripts}" stop --title=egg-server-server`);
   } catch (e) {
     console.log('停止服务警告（可忽略）:', e.message);
   }
@@ -61,14 +69,17 @@ async function run() {
   // 5. 安装依赖（失败不中断，用旧依赖尝试启动）
   console.log('安装依赖...');
   try {
-    await execAsync('npm install --production', { cwd: projectDir });
+    await execAsync(`"${npmBin}" install --production`, { cwd: projectDir });
   } catch (e) {
     console.log('安装依赖警告（尝试继续启动）:', e.message);
   }
 
   // 6. 启动服务
   console.log('启动服务...');
-  await execAsync('npm run start', { cwd: projectDir });
+  await execAsync(
+    `"${nodeBin}" "${eggScripts}" start --daemon --title=egg-server-server --workers=1`,
+    { cwd: projectDir }
+  );
   console.log('升级完成，当前版本:', release.tag_name);
 
   // 7. 清理临时文件
