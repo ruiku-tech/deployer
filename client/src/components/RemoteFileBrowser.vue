@@ -47,13 +47,13 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="大小" width="200">
+          <el-table-column label="大小" width="180">
             <template #default="scope">
-              <span v-if="scope.row.isDirectory || scope.row.sizeBytes == null">-</span>
-              <span v-else class="size-cell">
-                <span class="size-mb">{{ formatMB(scope.row.sizeBytes) }}</span>
-                <span class="size-bytes">{{ scope.row.sizeBytes.toLocaleString() }} 字节</span>
-              </span>
+              <template v-if="scope.row.isDirectory || scope.row.sizeBytes == null">-</template>
+              <template v-else>
+                <div class="size-mb">{{ formatMB(scope.row.sizeBytes) }}</div>
+                <div class="size-bytes">{{ scope.row.sizeBytes.toLocaleString() }} 字节</div>
+              </template>
             </template>
           </el-table-column>
           <el-table-column prop="permissions" label="权限" width="120" />
@@ -219,12 +219,6 @@ export default {
 
 .file-name {
   user-select: none;
-}
-
-.size-cell {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.3;
 }
 
 .size-mb {
