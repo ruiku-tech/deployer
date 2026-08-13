@@ -47,20 +47,41 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="size" label="大小" width="120" />
-          <el-table-column prop="permissions" label="权限" width="120" />
-          <el-table-column label="操作" width="100">
+          <el-table-column label="大小" width="200">
             <template #default="scope">
-              <el-button
-                v-if="!scope.row.isDirectory"
-                link
-                type="success"
-                size="small"
-                :loading="downloading === scope.row.name"
-                @click.stop="downloadFile(scope.row)"
-              >
-                {{ downloading === scope.row.name ? '下载中...' : '下载' }}
-              </el-button>
+              <span v-if="scope.row.isDirectory || scope.row.sizeBytes == null">-</span>
+              <span v-else class="size-cell">
+                <span class="size-mb">{{ formatMB(scope.row.sizeBytes) }}</span>
+                <span class="size-bytes">{{ scope.row.sizeBytes.toLocaleString() }} 字节</span>
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="permissions" label="权限" width="120" />
+          <el-table-column label="操作" width="130">
+            <template #default="scope">
+              <div v-if="!scope.row.isDirectory" class="download-cell">
+                <el-button
+                  link
+                  type="success"
+                  size="small"
+                  :loading="downloading === scope.row.name && downloadProgress[scope.row.name] == null"
+                  :disabled="downloading === scope.row.name"
+                  @click.stop="downloadFile(scope.row)"
+                >
+                  <span v-if="downloading === scope.row.name && downloadProgress[scope.row.name] != null">
+                    {{ downloadProgress[scope.row.name] }}%
+                  </span>
+                  <span v-else-if="downloading === scope.row.name">准备中...</span>
+                  <span v-else>下载</span>
+                </el-button>
+                <el-progress
+                  v-if="downloading === scope.row.name && downloadProgress[scope.row.name] != null"
+                  :percentage="downloadProgress[scope.row.name]"
+                  :stroke-width="4"
+                  :show-text="false"
+                  class="download-progress"
+                />
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -89,6 +110,7 @@ export default {
       fileList: [],
       loading: false,
       downloading: "",
+      downloadProgress: {},
     };
   },
   methods: {
@@ -117,16 +139,12 @@ export default {
     },
     handleRowClick(row) {
       if (row.isDirectory) {
-        // 点击文件夹，进入该目录
         if (row.name === "..") {
-          // 返回上级目录
           const parts = this.currentPath.split("/").filter((p) => p);
           parts.pop();
           this.currentPath = "/" + parts.join("/");
         } else {
-          // 进入子目录
-          const newPath = this.joinPath(this.currentPath, row.name);
-          this.currentPath = newPath;
+          this.currentPath = this.joinPath(this.currentPath, row.name);
         }
         this.loadPath();
       }
@@ -135,9 +153,12 @@ export default {
       const filePath = this.joinPath(this.currentPath, file.name);
 
       this.downloading = file.name;
+      this.$set ? this.$set(this.downloadProgress, file.name, null) : (this.downloadProgress[file.name] = null);
       ElMessage.info(`开始下载: ${file.name}，大文件请耐心等待...`);
 
-      downloadRemoteFile(this.hostInfo.name, filePath, file.name)
+      downloadRemoteFile(this.hostInfo.name, filePath, file.name, file.sizeBytes, (percent) => {
+        this.downloadProgress[file.name] = percent;
+      })
         .then(() => {
           ElMessage.success("下载成功: " + file.name);
         })
@@ -146,10 +167,10 @@ export default {
         })
         .finally(() => {
           this.downloading = "";
+          delete this.downloadProgress[file.name];
         });
     },
     joinPath(base, name) {
-      // 处理路径拼接
       if (base.endsWith("/")) {
         return base + name;
       }
@@ -159,6 +180,16 @@ export default {
       this.visible = false;
       this.fileList = [];
       this.currentPath = "/";
+    },
+    /** 将字节数格式化为可读的 MB/KB/B 字符串 */
+    formatMB(bytes) {
+      if (bytes >= 1024 * 1024) {
+        return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+      }
+      if (bytes >= 1024) {
+        return (bytes / 1024).toFixed(1) + " KB";
+      }
+      return bytes + " B";
     },
   },
 };
@@ -188,6 +219,31 @@ export default {
 
 .file-name {
   user-select: none;
+}
+
+.size-cell {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.size-mb {
+  font-weight: 500;
+}
+
+.size-bytes {
+  font-size: 11px;
+  color: #909399;
+}
+
+.download-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.download-progress {
+  width: 100%;
 }
 
 :deep(.el-table__row) {

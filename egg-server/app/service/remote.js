@@ -130,8 +130,8 @@ class RemoteService extends Service {
       conn = await this.createSSHConnection(config);
 
       // 使用 ls -lA 命令获取文件列表（不显示隐藏文件的. 和 ..）
-      // -l: 长格式 -A: 所有文件(除了.和..) -h: 人类可读的大小
-      const command = `ls -lAh "${remotePath}" 2>&1`;
+      // -l: 长格式 -A: 所有文件(除了.和..) 不加 -h 以获取精确字节数
+      const command = `ls -lA "${remotePath}" 2>&1`;
       console.log(`[RemoteService] 执行命令: ${command}`);
       const output = await this.executeCommand(conn, command);
       console.log(`[RemoteService] ls输出:\n${output}`);
@@ -168,9 +168,9 @@ class RemoteService extends Service {
         }
 
         const permissions = match[1];
-        const size = match[5];
+        const rawSize = match[5];
         let fullFileName = match[7];
-        
+
         // 如果是符号链接，分离出真实文件名
         let fileName = fullFileName;
         if (permissions.startsWith("l")) {
@@ -186,12 +186,15 @@ class RemoteService extends Service {
         // 判断是否为目录：d开头的是目录，l开头的符号链接也当作目录处理（可能指向目录）
         const isDirectory = permissions.startsWith("d") || permissions.startsWith("l");
 
-        console.log(`[RemoteService] 解析文件: name="${fileName}", isDir=${isDirectory}, permissions=${permissions}`);
+        // ls -lA（无 -h）的 size 字段是纯字节数
+        const sizeBytes = isDirectory ? null : (parseInt(rawSize, 10) || 0);
+
+        console.log(`[RemoteService] 解析文件: name="${fileName}", isDir=${isDirectory}, sizeBytes=${sizeBytes}, permissions=${permissions}`);
 
         files.push({
           name: fileName,
           isDirectory,
-          size: isDirectory ? "-" : size,
+          sizeBytes,
           permissions,
         });
       }
@@ -229,10 +232,10 @@ class RemoteService extends Service {
           // 创建读取流
           const readStream = sftp.createReadStream(filePath);
 
-          readStream.on("error", (err) => {
-            console.error(`[RemoteService] 读取文件失败:`, err);
+          readStream.on("error", (readErr) => {
+            console.error(`[RemoteService] 读取文件失败:`, readErr);
             conn.end();
-            reject(new Error(`读取文件失败: ${err.message}`));
+            reject(new Error(`读取文件失败: ${readErr.message}`));
           });
 
           passThrough.on("end", () => {

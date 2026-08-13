@@ -257,7 +257,7 @@ class DeployController extends Controller {
   // 下载远程服务器文件
   async downloadRemoteFile(ctx) {
     const { request: req } = ctx;
-    const { serverName, filePath } = req.query;
+    const { serverName, filePath, fileSize } = req.query;
 
     if (!serverName || !filePath) {
       ctx.status = 400;
@@ -279,6 +279,10 @@ class DeployController extends Controller {
       // 设置响应头
       ctx.set('Content-Type', 'application/octet-stream');
       ctx.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+      // 前端从文件列表里已知文件大小，通过 fileSize 参数传过来，用于浏览器计算下载进度
+      if (fileSize && !isNaN(Number(fileSize))) {
+        ctx.set('Content-Length', fileSize);
+      }
 
       // 返回文件流
       ctx.body = fileStream;
