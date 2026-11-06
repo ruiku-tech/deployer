@@ -214,6 +214,7 @@ module.exports = (app) => {
   router.get('/deploy/users', auth, controller.team.users);
   router.post('/deploy/team', auth, controller.team.save);
   router.post('/deploy/user', auth, controller.team.setUser);
+  router.post('/deploy/user/role', auth, controller.team.setRole);
   router.get('/deploy/schedules', auth, controller.schedule.list);
   router.post('/deploy/schedule/cancel', auth, controller.schedule.cancel);
   router.get('/deploy/notes', auth, deployMiddle, controller.deploy.getResourceNotes);

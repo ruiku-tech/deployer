@@ -13,7 +13,7 @@ const { code } = babel.transformSync(fs.readFileSync(filename, 'utf8'), {
 const token = exp => `header.${Buffer.from(JSON.stringify({ exp })).toString('base64url')}.signature`;
 
 function setup() {
-  const requests = [], responses = [], errors = [];
+  const requests = [], responses = [], errors = [], loading = [];
   const center = { token: { value: token(1000) }, env: { value: 'test' }, setToken(value) { this.token.value = value; } };
   const axios = { create: () => ({ interceptors: {
     request: { use: (...handlers) => requests.push(handlers) },
@@ -21,12 +21,15 @@ function setup() {
   } }) };
   const dependencies = {
     axios, '../dataCenter': center,
-    'element-plus': { ElMessage: { error: message => errors.push(message) }, ElLoading: { service: () => ({ close() {} }) } },
+    'element-plus': { ElMessage: { error: message => errors.push(message) }, ElLoading: { service: () => {
+      loading.push('open');
+      return { close() { loading.push('close'); } };
+    } } },
   };
   vm.runInNewContext(code, { exports: {}, process: { env: {} }, atob,
     require(name) { if (!(name in dependencies)) throw new Error(`Unexpected import ${name}`); return dependencies[name]; },
   }, { filename });
-  return { requests, success: responses[0][0], failure: responses[0][1], center, errors };
+  return { requests, success: responses[0][0], failure: responses[0][1], center, errors, loading };
 }
 function response(authorization, renewedToken) {
   return { config: { headers: { Authorization: authorization, nofeel: true } },
@@ -64,4 +67,32 @@ test('network failures without a response preserve the session', async () => {
   const env = setup();
   await assert.rejects(env.failure({ message: 'Network Error' }));
   assert.equal(env.center.token.value, token(1000));
+});
+
+test('schedule polling never opens or closes foreground request loading, including on failure', async () => {
+  const env = setup();
+  const apiFile = path.join(__dirname, '../src/api/deploys.js');
+  const api = babel.transformSync(fs.readFileSync(apiFile, 'utf8'), {
+    filename: apiFile, babelrc: false, configFile: false,
+    plugins: [require.resolve('@babel/plugin-transform-modules-commonjs')],
+  });
+  const exported = {};
+  let poll;
+  vm.runInNewContext(api.code, { exports: exported, require(name) {
+    assert.equal(name, './base');
+    return { get(url, config) { assert.equal(url, '/schedules'); poll = config; } };
+  } }, { filename: apiFile });
+  exported.fetchSchedules();
+  env.requests.forEach(([handler]) => handler(poll));
+  env.success({ config: poll, headers: {}, data: { data: [] } });
+  assert.deepEqual(env.loading, []);
+
+  const foreground = { headers: {} };
+  env.requests.forEach(([handler]) => handler(foreground));
+  assert.deepEqual(env.loading, ['open']);
+  env.success({ config: poll, headers: {}, data: { data: [] } });
+  await assert.rejects(env.failure({ config: poll, message: 'Network Error' }));
+  assert.deepEqual(env.loading, ['open']);
+  env.success({ config: foreground, headers: {}, data: { data: 'ok' } });
+  assert.deepEqual(env.loading, ['open', 'close']);
 });

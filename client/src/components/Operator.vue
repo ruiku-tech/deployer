@@ -3,12 +3,12 @@
     <aside class="sidebar">
       <div class="nav-title">工作空间</div>
       <button v-for="item in menus" :key="item.name" :class="{ active: active === item.name }" @click="active = item.name"><span class="nav-dot"></span>{{ item.label }}</button>
-      <div class="sidebar-footer">{{ username }}<span>{{ userRole === 'superadmin' ? '超级管理员' : '团队成员' }}</span></div>
+      <div class="sidebar-footer">{{ username }}<span>{{ userRole === 'superadmin' ? '超级管理员' : userRole === 'admin' ? '管理员' : '团队成员' }}</span></div>
     </aside>
     <main class="workspace">
       <div class="page-heading"><h2>{{ currentLabel }}</h2><span>{{ currentEnv || '请在右上角创建或选择环境' }}</span></div>
       <component :is="activeComponent" v-if="activeComponent" :key="active" />
-      <el-empty v-else :description="userRole === 'superadmin' ? '请先创建分组与环境' : '请联系管理员分配分组，或在右上角选择环境'" />
+      <el-empty v-else :description="isAdmin ? '请先创建分组与环境' : '请联系管理员分配分组，或在右上角选择环境'" />
     </main>
   </div>
 </template>
@@ -30,10 +30,11 @@ export default {
     currentEnv() { return dataCenter.env.value; },
     username() { return dataCenter.user.value; },
     userRole() { return dataCenter.role.value; },
+    isAdmin() { return ['superadmin', 'admin'].includes(this.userRole); },
     menus() {
       const items = this.currentEnv ? [ { name: 'files', label: '文件管理' }, { name: 'vars', label: '全局变量' }, { name: 'hosts', label: '服务器管理' }, { name: 'configs', label: '配置管理' }, { name: 'scripts', label: '脚本管理' }, { name: 'deploys', label: '部署编排' }, { name: 'record', label: '发布记录' } ] : [];
       items.push({ name: 'schedules', label: '定时发布' });
-      if (this.userRole === 'superadmin') items.push({ name: 'teams', label: '成员与分组' });
+      if (this.isAdmin) items.push({ name: 'teams', label: '成员与分组' });
       return items;
     },
     activeComponent() { return this.menus.some(x => x.name === this.active) ? pages[this.active] : null; },

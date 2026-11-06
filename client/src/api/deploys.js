@@ -3,7 +3,7 @@ import service from "./base";
 export function deploy(list, env, files, runAt) {
   return service.post("/deploy", { list, env, files, runAt });
 }
-export function fetchSchedules() { return service.get('/schedules'); }
+export function fetchSchedules() { return service.get('/schedules', { headers: { nofeel: true } }); }
 export function cancelSchedule(id) { return service.post('/schedule/cancel', { id }); }
 
 // host:pasword

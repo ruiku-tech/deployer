@@ -32,6 +32,7 @@ export default {
       logVisible: false,
       logFullscreen: false,
       diskTimer: null,
+      identityRevision: 0,
     };
   },
   components: {
@@ -50,16 +51,28 @@ export default {
   watch: {
     authenticated: { immediate: true, handler(token) {
       clearInterval(this.diskTimer);
+      this.identityRevision++;
       if (token) {
         this.loadDisk();
-        service.get('/me').then(user => { dataCenter.role.value = user.role; dataCenter.user.value = user.username; });
-        this.diskTimer = setInterval(this.loadDisk, 30000);
+        this.loadIdentity();
+        this.diskTimer = setInterval(() => { this.loadDisk(); this.loadIdentity(); }, 30000);
+      } else {
+        dataCenter.role.value = 'member';
+        dataCenter.user.value = '';
       }
     } },
   },
   computed: { authenticated() { return !!dataCenter.token.value; } },
   beforeUnmount() { clearInterval(this.diskTimer); },
   methods: {
+    loadIdentity() {
+      const revision = this.identityRevision;
+      return service.get('/me', { headers: { nofeel: true } }).then(user => {
+        if (!this.authenticated || revision !== this.identityRevision) return;
+        dataCenter.role.value = user.role;
+        dataCenter.user.value = user.username;
+      }).catch(() => {});
+    },
     loadDisk() { service.get('/disk', { headers: { nofeel: true } }).then(data => { this.disk = data; }).catch(() => {}); },
     formatSize(value) { return `${(value / 1024 / 1024 / 1024).toFixed(1)} GB`; },
     logout() { dataCenter.setToken(''); },

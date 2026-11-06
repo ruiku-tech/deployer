@@ -26,7 +26,7 @@ class envController extends Controller {
       ctx.body = { err };
     }
   }
-  // 环境归属只能由超级管理员修改，每个环境始终只关联一个分组。
+  // 环境归属只能由管理员修改，每个环境始终只关联一个分组。
   async setTeam() {
     const { ctx } = this;
     access.assertAdmin(ctx);

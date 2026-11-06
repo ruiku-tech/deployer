@@ -22,11 +22,14 @@ class WSController extends Controller {
     let decoded;
     try {
       decoded = ctx.app.jwt.verify(ctx.query.token, ctx.app.config.jwt.secret);
-      if (!access.canAccess(decoded.username, ctx.params.env)) throw new Error('无权访问');
-    } catch (err) { websocket.close(); return; }
+    } catch (err) { websocket.close(4401, '登录已过期，请重新登录后连接'); return; }
+    if (!access.canAccess(decoded.username, ctx.params.env)) {
+      websocket.close(4403, '无权访问此环境或账号已被停用');
+      return;
+    }
     const sessionId = uuidv4();
     const permissionTimer = setInterval(() => {
-      if (!access.canAccess(decoded.username, ctx.params.env)) websocket.close();
+      if (!access.canAccess(decoded.username, ctx.params.env)) websocket.close(4403, '环境访问权限已失效');
     }, 5000);
     permissionTimer.unref();
 

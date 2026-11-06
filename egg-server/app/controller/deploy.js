@@ -659,7 +659,7 @@ class DeployController extends Controller {
   async scriptDetail(ctx) {
     const { request: req, response: res } = ctx;
     // 查询文档并按时间倒序排序，进行分页
-    const scripts = database.findScriptRecords(req.headers.env, access.user(ctx.state.user.username).role === 'superadmin');
+    const scripts = database.findScriptRecords(req.headers.env, access.isAdmin(access.user(ctx.state.user.username)));
 
     // 获取总文档数量，用于计算总页数
     // const totalDocuments = await fileDocument.countDocuments();
@@ -668,7 +668,7 @@ class DeployController extends Controller {
   }
   async scriptDelete(ctx) {
     const { request: req, response: res } = ctx;
-    database.deleteScriptRecord(req.body.text, req.headers.env, access.user(ctx.state.user.username).role === 'superadmin');
+    database.deleteScriptRecord(req.body.text, req.headers.env, access.isAdmin(access.user(ctx.state.user.username)));
     ctx.body = { data: "success" };
   }
 

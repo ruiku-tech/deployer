@@ -8,5 +8,31 @@
 <script>
 import { fetchSchedules, cancelSchedule } from '../api';
 import { ElMessage, ElMessageBox } from 'element-plus';
-export default { data() { return { list: [], timer: null }; }, mounted() { this.load(); this.timer = setInterval(this.load, 10000); }, beforeUnmount() { clearInterval(this.timer); }, methods: { statusLabel(v) { return { pending: '待执行', running: '执行中', success: '成功', failed: '失败', cancelled: '已取消', interrupted: '已中断' }[v] || v; }, load() { fetchSchedules().then(x => { this.list = x || []; }); }, format(v) { return new Date(v).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }); }, cancel(id) { ElMessageBox.confirm('确认取消这个定时发布？', '取消发布').then(() => cancelSchedule(id)).then(() => { ElMessage.success('已取消'); this.load(); }); } } };
+export default {
+  data() { return { list: [], timer: null, fetching: false }; },
+  mounted() {
+    this.load();
+    this.timer = setInterval(() => { if (!document.hidden) this.load(); }, 10000);
+  },
+  beforeUnmount() { clearInterval(this.timer); },
+  methods: {
+    statusLabel(v) { return { pending: '待执行', running: '执行中', success: '成功', failed: '失败', cancelled: '已取消', interrupted: '已中断' }[v] || v; },
+    async load() {
+      if (this.fetching) return;
+      this.fetching = true;
+      try { this.list = await fetchSchedules() || []; }
+      catch { /* API interceptor displays errors. */ }
+      finally { this.fetching = false; }
+    },
+    format(v) { return new Date(v).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }); },
+    async cancel(id) {
+      try {
+        await ElMessageBox.confirm('确认取消这个定时发布？', '取消发布');
+        await cancelSchedule(id);
+        ElMessage.success('已取消');
+        await this.load();
+      } catch { /* Includes user cancellation. */ }
+    },
+  },
+};
 </script>

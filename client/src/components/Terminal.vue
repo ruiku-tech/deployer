@@ -97,7 +97,7 @@ export default {
       const wsUrl = `${protocol}//${window.location.host}/terminal/${encodeURIComponent(env)}?token=${encodeURIComponent(dataCenter.token.value)}`;
 
       this.terminal.writeln("正在连接到服务器...");
-      console.log('[Terminal] 连接WebSocket:', wsUrl);
+      console.log('[Terminal] 连接WebSocket:', `${protocol}//${window.location.host}/terminal/${encodeURIComponent(env)}`);
       console.log('[Terminal] 主机信息:', {
         name: this.hostInfo.name,
         host: this.hostInfo.host,
@@ -165,8 +165,9 @@ export default {
           console.error("WebSocket error:", error);
         };
 
-        this.websocket.onclose = () => {
-          this.terminal.writeln("\r\n连接已关闭\r\n");
+        this.websocket.onclose = (event) => {
+          clearTimeout(connectTimeout);
+          this.terminal?.writeln(`\r\n连接已关闭${event.reason ? `：${event.reason}` : ''}\r\n`);
         };
       } catch (error) {
         this.terminal.writeln(`\r\n连接失败: ${error.message}\r\n`);

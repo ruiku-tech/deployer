@@ -64,7 +64,7 @@ export default {
     this.fresh();
   },
   computed: {
-    isAdmin() { return dataCenter.role.value === 'superadmin'; },
+    isAdmin() { return ['superadmin', 'admin'].includes(dataCenter.role.value); },
     currentEnvironment() { return this.list.find(item => item.name === this.env); },
   },
   methods: {
