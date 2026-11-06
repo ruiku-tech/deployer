@@ -36,5 +36,11 @@ archive.file(path.resolve(__dirname, "..", "package.json"), {
 archive.file(path.resolve(__dirname, "..", "package-lock.json"), {
   name: "package-lock.json",
 });
+archive.file(path.resolve(__dirname, "..", "ecosystem.config.js"), {
+  name: "ecosystem.config.js",
+});
+archive.file(path.resolve(__dirname, "..", "app.js"), {
+  name: "app.js",
+});
 // 完成压缩操作
 archive.finalize();

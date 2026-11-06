@@ -1,8 +1,11 @@
 const fs = require('fs');
 const config = require('./config');
 const path = require('path');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const archiver = require('archiver');
+const database = require('./database');
+const execFileAsync = promisify(execFile);
 
 function create(env) {
   const context = config.createContext(env);
@@ -37,45 +40,24 @@ function create(env) {
   }
 }
 
-function copy(env, src) {
+async function copy(env, src) {
   const context = config.createContext(env);
   const srcContext = config.createContext(src);
-
-  return new Promise((resolve, reject) => {
-    exec(
-      `cp -rf "${srcContext.dir}" "${context.dir}"`,
-      (error, stdout, stderr) => {
-        if (error) {
-          reject({ err: error.message });
-          return;
-        }
-        if (stderr) {
-          reject({ err: stderr });
-          return;
-        }
-        resolve();
-      }
-    );
-  });
+  if (fs.existsSync(context.dir)) {
+    const error = new Error('目标环境已存在');
+    error.code = 'EEXIST';
+    throw error;
+  }
+  try {
+    await fs.promises.cp(srcContext.dir, context.dir, { recursive: true, errorOnExist: true, force: false });
+  } catch (err) {
+    await fs.promises.rm(context.dir, { recursive: true, force: true });
+    throw err;
+  }
 }
 function destory(env) {
   const context = config.createContext(env);
-  return new Promise((resolve, reject) => {
-    exec(
-      `rm -rf "${context.dir}"`,
-      (error, stdout, stderr) => {
-        if (error) {
-          reject({ err: error.message });
-          return;
-        }
-        if (stderr) {
-          reject({ err: stderr });
-          return;
-        }
-        resolve();
-      }
-    );
-  });
+  return fs.promises.rm(context.dir, { recursive: true, force: true });
 }
 
 // 导出环境配置到压缩包，返回 archiver 对象由调用方 pipe
@@ -105,38 +87,36 @@ function exportEnv(env) {
   if (fs.existsSync(context.batDir)) {
     archive.directory(context.batDir, 'bats');
   }
+  archive.append(JSON.stringify(database.getDb().prepare('SELECT type,name,note FROM resource_notes WHERE env=?').all(env)), { name: 'resource-notes.json' });
 
   return archive;
 }
 
 // 从压缩包导入环境配置
 function importEnv(env, zipFilePath) {
-  return new Promise((resolve, reject) => {
+  return (async () => {
     const context = config.createContext(env);
-
-    // 先创建基本环境结构
+    const { stdout } = await execFileAsync('unzip', ['-Z1', zipFilePath]);
+    for (const entry of stdout.split(/\r?\n/).filter(Boolean)) {
+      const normalized = entry.replaceAll('\\', '/');
+      if (normalized.startsWith('/') || normalized.split('/').includes('..') || normalized.includes('\0')) throw new Error('压缩包包含无效路径');
+    }
     create(env);
-
-    // 使用系统 unzip 命令解压文件
-    exec(
-      `unzip -o "${zipFilePath}" -d "${context.dir}"`,
-      (error, stdout, stderr) => {
-        // 清理上传的临时文件
-        try {
-          fs.unlinkSync(zipFilePath);
-        } catch (e) {
-          // 忽略删除错误
+    try {
+      await execFileAsync('unzip', ['-o', zipFilePath, '-d', context.dir]);
+      const walk = async dir => {
+        for (const entry of await fs.promises.readdir(dir, { withFileTypes: true })) {
+          const target = path.join(dir, entry.name);
+          if (entry.isSymbolicLink()) throw new Error('压缩包不允许包含符号链接');
+          if (entry.isDirectory()) await walk(target);
         }
-
-        if (error) {
-          reject({ err: error.message });
-          return;
-        }
-        
-        resolve();
-      }
-    );
-  });
+      };
+      await walk(context.dir);
+    } catch (err) {
+      await fs.promises.rm(context.dir, { recursive: true, force: true });
+      throw err;
+    }
+  })();
 }
 
 module.exports = {

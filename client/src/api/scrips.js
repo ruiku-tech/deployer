@@ -7,8 +7,8 @@ export function fetchScripts() {
 export function fetchScript(name) {
   return service.get(`/script?name=${encodeURIComponent(name)}`);
 }
-export function saveScript(name, data) {
-  return service.post("/script", { name, data });
+export function saveScript(name, data, note) {
+  return service.post("/script", { name, data, note });
 }
 export function APIGetHostSelect() {
   return service.get("/hosts");

@@ -147,7 +147,7 @@ export default {
         this.installMsg = "";
         selfUpdate(release.tag)
           .then((resp) => {
-            this.installMsg = resp?.data || `${release.tag} 安装进程已启动，服务将在几分钟内自动重启`;
+            this.installMsg = resp || `${release.tag} 安装任务已提交，服务将在更新完成后自动重启`;
             ElMessage({ type: "success", message: this.installMsg, duration: 6000 });
           })
           .catch((err) => {

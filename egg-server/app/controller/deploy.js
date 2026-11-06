@@ -1,6 +1,5 @@
 const { Controller } = require("egg");
 const dayjs = require("dayjs");
-const cert = require("../service/cert");
 const utils = require("../service/utils");
 const multer = require("multer");
 const { log, error } = require("console");
@@ -10,6 +9,8 @@ const path = require("path");
 const config = require("../service/config");
 const pump = require("mz-modules/pump");
 const database = require("../service/database");
+const access = require('./../service/access');
+const disk = require("../service/disk");
 const speakeasy = require("speakeasy");
 const userFile = config.userFile();
 const storage = multer.diskStorage({
@@ -32,7 +33,7 @@ const readdir = util.promisify(fs.readdir);
 const writeFile = util.promisify(fs.writeFile);
 const unlink = util.promisify(fs.unlink);
 // 初始化环境
-const workspaceDir = path.resolve(__dirname, "../../workspace");
+const workspaceDir = config.workspace;
 if (!fs.existsSync(workspaceDir)) {
   fs.mkdirSync(workspaceDir);
 }
@@ -52,7 +53,7 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     try {
       const data = await readFile(req.context.varsFile, "utf-8");
-      ctx.body = { data };
+      ctx.body = { data, notes: Object.fromEntries(database.listNotes(req.headers.env, 'var').map(row => [row.name, row.note])) };
     } catch (err) {
       ctx.body = { err };
     }
@@ -68,10 +69,26 @@ class DeployController extends Controller {
         req.body.data,
         "utf-8"
       );
+      if (req.body.note !== undefined && req.body.name) database.setNote(req.headers.env, 'var', req.body.name, req.body.note);
       ctx.body = { data };
     } catch (err) {
       ctx.body = { err };
     }
+  }
+
+  async getResourceNotes(ctx) {
+    const { type } = ctx.query;
+    ctx.assert(['var', 'host', 'config', 'script', 'bat'].includes(type), 400, '备注类型无效');
+    ctx.body = { data: Object.fromEntries(database.listNotes(ctx.headers.env, type).map(row => [row.name, row.note])) };
+  }
+
+  async postResourceNote(ctx) {
+    const type = ctx.request.body.type;
+    const name = ctx.request.body.name;
+    ctx.assert(['var', 'host', 'config', 'script', 'bat'].includes(type), 400, '备注类型无效');
+    ctx.assert(typeof name === 'string' && name && !/[\\/\0]/.test(name), 400, '名称无效');
+    database.setNote(ctx.headers.env, type, name, ctx.request.body.note || '');
+    ctx.body = { data: 'success' };
   }
   // 获取文件列表
   async getFiles(ctx) {
@@ -120,6 +137,13 @@ class DeployController extends Controller {
 
   // 文件上传
   async uploadFile(ctx) {
+    try {
+      await disk.requireSpace(workspaceDir, Number(ctx.request.length) || 0);
+    } catch (err) {
+      ctx.status = err.code === 'ENOSPC' ? 507 : 500;
+      ctx.body = { message: err.message };
+      return;
+    }
     const stream = await ctx.getFileStream();
     const { request: req } = ctx;
     const memos = req.headers.memo;
@@ -136,7 +160,14 @@ class DeployController extends Controller {
     // 创建写流
     const writeStream = fs.createWriteStream(targetPath);
     // 使用 pump 将文件流传输到写流
-    await pump(stream, writeStream);
+    try {
+      await pump(stream, disk.uploadGuard(workspaceDir), writeStream);
+    } catch (err) {
+      await fs.promises.unlink(targetPath).catch(() => {});
+      ctx.status = err.code === 'ENOSPC' ? 507 : 500;
+      ctx.body = { message: err.code === 'ENOSPC' ? '服务器磁盘空间不足，请清理文件后重试' : err.message };
+      return;
+    }
     try {
       database.createFileMemo({ fileName, memo });
     } catch (err) {
@@ -172,6 +203,8 @@ class DeployController extends Controller {
       ctx.body = { message: "Missing required parameters" };
       return;
     }
+    ctx.assert(typeof fileName === 'string' && !/[\\/\0]/.test(fileName) && !['.', '..'].includes(fileName), 400, '文件名无效');
+    access.assertEnv(ctx, targetEnv);
 
     if (targetEnv === env) {
       ctx.body = { data: "success" };
@@ -179,7 +212,7 @@ class DeployController extends Controller {
     }
 
     console.log("req", req.body, "currEnv:{}", req.headers.env);
-    const basePath = path.resolve(__dirname, "../../workspace");
+    const basePath = config.workspace;
     const currentFilePath = path.resolve(basePath, env, "files", fileName);
     const targetFilePath = path.resolve(basePath, targetEnv, "files", fileName);
 
@@ -189,6 +222,14 @@ class DeployController extends Controller {
       console.error("Error: Source file does not exist.", err);
       ctx.status = 404;
       ctx.body = { message: "Source file does not exist" };
+      return;
+    }
+    try {
+      ctx.assert(!(await fs.promises.lstat(currentFilePath)).isSymbolicLink(), 400, '文件不允许为符号链接');
+      await disk.requireSpace(workspaceDir, (await fs.promises.stat(currentFilePath)).size);
+    } catch (err) {
+      ctx.status = err.status || (err.code === 'ENOSPC' ? 507 : 500);
+      ctx.body = { message: err.message };
       return;
     }
 
@@ -209,8 +250,8 @@ class DeployController extends Controller {
       ctx.body = { data: "success" };
     } catch (err) {
       console.error("Error copying file:", err);
-      ctx.status = 500;
-      ctx.body = { message: "Error copying file" };
+      ctx.status = err.code === 'ENOSPC' ? 507 : 500;
+      ctx.body = { message: err.code === 'ENOSPC' ? '服务器磁盘空间不足，请清理文件后重试' : '复制文件失败' };
     }
   }
 
@@ -309,7 +350,7 @@ class DeployController extends Controller {
         }, {});
       } catch (error) {}
 
-      ctx.body = { data: ret };
+      ctx.body = { data: ret, notes: Object.fromEntries(database.listNotes(req.headers.env, 'host').map(row => [row.name, row.note])) };
     } catch (err) {
       ctx.body = { err };
     }
@@ -328,13 +369,24 @@ class DeployController extends Controller {
         console.log("本地解析已存在的配置失败");
       }
     }
-    Object.assign(data, req.body.data);
+    for (const [name, value] of Object.entries(req.body.data || {})) {
+      ctx.assert(typeof value === 'string', 400, '服务器配置无效');
+      const parts = value.split(':');
+      if (!parts[1]) {
+        ctx.assert(data[name], 400, '请输入服务器密码或密钥');
+        parts[1] = data[name].split(':')[1];
+      }
+      data[name] = parts.join(':');
+    }
     try {
       await writeFile(
         req.context.hostsFile,
         JSON.stringify(data, null, 2),
         "utf-8"
       );
+      if (req.body.notes && typeof req.body.notes === 'object') {
+        for (const [name, note] of Object.entries(req.body.notes)) database.setNote(req.headers.env, 'host', name, note);
+      }
       ctx.body = { data: "success" };
     } catch (err) {
       ctx.body = { err };
@@ -369,7 +421,7 @@ class DeployController extends Controller {
 
     try {
       const files = await readdir(context.configDir);
-      ctx.body = { data: files.map((name) => ({ name })) };
+      ctx.body = { data: files.map((name) => ({ name, note: database.getNote(req.headers.env, 'config', name) })) };
     } catch (err) {
       ctx.body = { err };
     }
@@ -397,6 +449,7 @@ class DeployController extends Controller {
 
     try {
       await writeFile(filePath, req.body.data, "utf-8");
+      database.setNote(req.headers.env, 'config', name, req.body.note);
       ctx.body = { success: true };
     } catch (err) {
       ctx.body = { err };
@@ -424,7 +477,7 @@ class DeployController extends Controller {
 
     try {
       const files = await readdir(context.scriptDir);
-      ctx.body = { data: files.map((name) => ({ name })) };
+      ctx.body = { data: files.map((name) => ({ name, note: database.getNote(req.headers.env, 'script', name) })) };
     } catch (err) {
       ctx.body = { err };
     }
@@ -452,6 +505,7 @@ class DeployController extends Controller {
 
     try {
       await writeFile(filePath, req.body.data, "utf-8");
+      database.setNote(req.headers.env, 'script', name, req.body.note);
       ctx.body = { success: true };
     } catch (err) {
       ctx.body = { err };
@@ -478,7 +532,7 @@ class DeployController extends Controller {
 
     try {
       const files = await readdir(req.context.batDir);
-      ctx.body = { data: files.map((name) => ({ name })) };
+      ctx.body = { data: files.map((name) => ({ name, note: database.getNote(req.headers.env, 'bat', name) })) };
     } catch (err) {
       ctx.body = { err };
     }
@@ -511,6 +565,7 @@ class DeployController extends Controller {
 
     try {
       const data = await writeFile(filePath, "{}", "utf-8");
+      database.setNote(req.headers.env, 'bat', name, req.body.note);
       ctx.body = { data };
     } catch (err) {
       ctx.body = { err };
@@ -542,8 +597,9 @@ class DeployController extends Controller {
       const json = JSON.parse(data);
       const { name, ...rest } = req.body.data;
       json[name] = rest;
+      database.setNote(req.headers.env, 'bat-item', `${req.body.name}:${name}`, req.body.data.note);
 
-      writeFile(filePath, JSON.stringify(json), "utf-8");
+      await writeFile(filePath, JSON.stringify(json), "utf-8");
       ctx.body = { success: true };
     } catch (err) {
       ctx.body = { err };
@@ -561,7 +617,7 @@ class DeployController extends Controller {
       const json = JSON.parse(data);
       delete json[req.query.item];
 
-      writeFile(filePath, JSON.stringify(json), "utf-8");
+      await writeFile(filePath, JSON.stringify(json), "utf-8");
       ctx.body = { success: true };
     } catch (err) {
       ctx.body = { err };
@@ -581,52 +637,29 @@ class DeployController extends Controller {
 
   // 部署
   async postDeploy(ctx) {
-    const { request: req, response: res } = ctx;
-    // [{name:string,host:string,cmds:string[]}]
-    let list = req.body.list;
-    const env = req.body.env;
-    const recordList = list.map((item) => ({
-      ...item,
-      username: ctx.state.user.username,
-    }));
-    if (!list || !list.length) {
-      return (ctx.body = { err: "请选择部署的脚本" });
-    }
-    const vars = utils.parseVars.call(req.context);
-    const hosts = utils.parseHosts.call(req.context);
-    const context = Object.assign(
-      { vars, hosts, files: req.body.files },
-      req.context
-    );
-    list = ctx.service.executer.parse(env, context, list);
-    const parseErrs = list.filter((item) => item.err);
-    if (parseErrs.length) {
-      return (ctx.body = {
-        err: parseErrs.map((item) => item.err).join(","),
-      });
-    }
-    // 记录部署记录
-    // fs.writeFile(
-    //   path.resolve(
-    //     req.context.deployDir,
-    //     `${dayjs().format('YYYYMMDD-HH:mm:ss')}.txt`
-    //   ),
-    //   JSON.stringify(list, null, 2),
-    //   'utf-8',
-    //   () => {}
-    // );
-    const user = database.createRecords(recordList, env);
+    const { request: req } = ctx;
+    const env = req.headers.env;
+    ctx.assert(!req.body.env || req.body.env === env, 400, '环境不匹配');
+    const payload = { list: req.body.list, files: req.body.files || {} };
     try {
-      ctx.service.executer.deployList(list);
-      ctx.body = { data: user };
+      if (req.body.runAt) {
+        const id = await ctx.service.releases.create(env, payload, ctx.state.user.username, Number(req.body.runAt));
+        ctx.body = { data: { id } };
+      } else {
+        ctx.service.releases.prepare(env, payload);
+        const job = ctx.app.createAnonymousContext();
+        job.service.releases.execute(env, payload, ctx.state.user.username).catch(err => ctx.logger.error('发布失败: %s', err.message));
+        ctx.body = { data: 'success' };
+      }
     } catch (err) {
-      ctx.body = { err };
+      ctx.status = 400;
+      ctx.body = { message: err.message };
     }
   }
   async scriptDetail(ctx) {
     const { request: req, response: res } = ctx;
     // 查询文档并按时间倒序排序，进行分页
-    const scripts = database.findScriptRecords();
+    const scripts = database.findScriptRecords(req.headers.env, access.user(ctx.state.user.username).role === 'superadmin');
 
     // 获取总文档数量，用于计算总页数
     // const totalDocuments = await fileDocument.countDocuments();
@@ -635,7 +668,7 @@ class DeployController extends Controller {
   }
   async scriptDelete(ctx) {
     const { request: req, response: res } = ctx;
-    database.deleteScriptRecord(req.body.text);
+    database.deleteScriptRecord(req.body.text, req.headers.env, access.user(ctx.state.user.username).role === 'superadmin');
     ctx.body = { data: "success" };
   }
 
@@ -648,7 +681,7 @@ class DeployController extends Controller {
     }
     const text = req.body.cmd;
     if (req.body.cache) {
-      try { database.createScriptRecord({ text }); } catch(e) {}
+      try { database.createScriptRecord({ text, env: req.headers.env }); } catch(e) {}
     }
     database.createRecord({
       cmds: [req.body.cmd],
@@ -690,60 +723,25 @@ class DeployController extends Controller {
 
   // 获取正在部署的
   async getDeployings(ctx) {
-    ctx.body = { data: ctx.service.executer.getDeployings() };
+    const env = ctx.headers.env;
+    access.assertEnv(ctx, env);
+    ctx.body = { data: ctx.service.executer.getDeployings(env) };
   }
 
   // 获取部署
   async deleteDeploying(ctx) {
     const { request: req, response: res } = ctx;
     const host = req.query.host;
-    ctx.service.executer.stopDeploy(host);
+    ctx.service.executer.stopDeploy(host, req.headers.env);
     ctx.body = { data: "sccess" };
-  }
-
-  // 申请证书
-  async postDeploySsl(ctx) {
-    const { request: req, response: res } = ctx;
-    const domain = req.body.domain;
-    const hosts = utils.parseHosts.call(req.context);
-    const server = hosts[req.body.server];
-    if (!server) {
-      return (ctx.body = { err: `找不到服务器:${req.body.server}` });
-    }
-    await cert
-      .requestCertificate(server, domain, ctx)
-      .then(() => {
-        ctx.body = { data: "sccess" };
-      })
-      .catch((err) => {
-        ctx.body = { err };
-      });
-  }
-
-  async getApiAuto(ctx) {
-    const { request: req, response: res } = ctx;
-    // apiAuto.init(req.query.host);
-    try {
-      const ApiTester = require("../api_test/index");
-      global.isTest = false;
-      new ApiTester({
-        host: `${req.query.host}:${req.query.port}`,
-        prefix: `${req.query.prefix}`,
-      }).run();
-      ctx.body = { data: "sccess" };
-    } catch (error) {
-      ctx.body = { error };
-    }
   }
 
   // 注册
   async postRegister(ctx) {
     const { request: req, response: res } = ctx;
-    console.log("谷歌密钥环境变量", process.env.DEPLOY_KEY);
     const secret =
       process.env.DEPLOY_KEY ||
       "EQQWMZ2IKRXHSQLCFBNEAS2JEFZHQMTOFIVEO6RJIZGHO2CAMRNA";
-    console.log("!!!!secret", secret);
     const verified = speakeasy.totp.verify({
       secret, // 使用生成的密钥
       encoding: "base32",
@@ -760,10 +758,8 @@ class DeployController extends Controller {
     }
 
     try {
-      database.createUser({
-        username: req.body.username,
-        password: req.body.password,
-      });
+      ctx.assert(typeof req.body.username === 'string' && req.body.username.trim().length > 0 && typeof req.body.password === 'string' && req.body.password.length >= 6, 400, '用户名或密码无效');
+      access.register(req.body.username, req.body.password);
       database.createRecord({
         cmds: [],
         host: req.ip,
@@ -780,16 +776,13 @@ class DeployController extends Controller {
   async postLogin(ctx) {
     const { request: req, response: res } = ctx;
     try {
+      access.init();
       const users = database.findUsers({
         username: req.body.username,
         password: req.body.password,
       });
-      if (users.length > 0) {
-        const token = ctx.app.jwt.sign(
-          { username: req.body.username },
-          ctx.app.config.jwt.secret,
-          { expiresIn: ctx.app.config.jwt.expiresIn }
-        );
+      if (users.length > 0 && !users[0].disabled) {
+        const token = require('../service/session').issueToken(ctx.app, req.body.username);
         database.createRecord({
           cmds: [],
           host: req.ip,
@@ -797,7 +790,7 @@ class DeployController extends Controller {
           username: req.body.username,
           time: Date.now(),
         });
-        ctx.body = { data: { username: req.body.username, token: token } };
+        ctx.body = { data: { username: req.body.username, role: users[0].role, token: token } };
       } else {
         ctx.body = { err: { code: "用户名或密码错误" } };
       }
@@ -810,7 +803,7 @@ class DeployController extends Controller {
     const { request: req, response: res } = ctx;
     const page = req.query.page || 1;
     const pageSize = req.query.pageSize || 30;
-    const env = req.query.env || '';
+    const env = req.headers.env;
     try {
       const records = database.findRecords({ page: Number(page), pageSize: Number(pageSize), env });
       const total = database.countRecords(env);
@@ -822,7 +815,13 @@ class DeployController extends Controller {
   // 删除记录数据
   async postRecordDelete(ctx) {
     const { request: req, response: res } = ctx;
-    const result = database.deleteRecord(req.body.item);
+    const item = { ...(req.body.item || {}) };
+    ctx.assert(!item.env || item.env === req.headers.env, 403, '无权删除此记录');
+    if (item.id) {
+      const row = database.getDb().prepare('SELECT env FROM records WHERE id=?').get(item.id);
+      ctx.assert(row && row.env === req.headers.env, 403, '无权删除此记录');
+    } else item.env = req.headers.env;
+    const result = database.deleteRecord(item);
     if (result.changes >= 1) {
       ctx.body = { data: "success" };
     } else {
@@ -926,13 +925,14 @@ class DeployController extends Controller {
   }
 
   async selfUpdate(ctx) {
+    access.assertAdmin(ctx);
     try {
       const version = ctx.request.body.version || null;
-      utils.selfUpdate(version);
+      await utils.selfUpdate(version);
       ctx.body = {
         data: version
-          ? `升级到 ${version} 的进程已启动，服务将在几分钟内自动重启`
-          : "升级进程已启动，服务将在几分钟内自动重启"
+          ? `升级任务已交给 PM2，目标版本 ${version}，服务将在更新完成后自动重启`
+          : "升级任务已交给 PM2，服务将在更新完成后自动重启"
       };
     } catch (error) {
       console.error("启动升级失败:", error);

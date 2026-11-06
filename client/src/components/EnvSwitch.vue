@@ -1,6 +1,6 @@
 <template>
   <div id="env-switch">
-    <el-popover placement="right" trigger="click">
+    <el-popover placement="bottom-end" trigger="click" :width="300" @show="fresh">
       <template #reference>
         <el-button size="small" style="margin-right: 16px"
           >环境:{{ env }}</el-button
@@ -12,53 +12,79 @@
           v-for="item in list"
           :key="item.name"
           @click="changeEnv(item.name)"
-          >{{ item.name }}</el-button
+          ><span class="env-option"><span>{{ item.name }}</span><span class="env-team">{{ item.teamName || '未设置分组' }}</span></span></el-button
         >
         <hr />
-        <el-button size="small" type="primary" @click="cloneEnv"
+        <div v-if="currentEnvironment" class="current-group">当前环境所属分组：{{ currentEnvironment.teamName || '未设置' }}</div>
+        <el-button v-if="isAdmin && currentEnvironment" size="small" @click="openGroupDialog">设置当前环境所属分组</el-button>
+        <div class="new-group-label">新建、克隆或导入环境的所属分组</div>
+        <el-select v-model="teamId" placeholder="新环境所属分组"><el-option v-for="team in teams" :key="team.id" :label="team.name" :value="team.id" /></el-select>
+        <el-button size="small" type="primary" :disabled="!env || env === '未选择'" @click="cloneEnv"
           >克隆当前环境</el-button
         >
         <el-button size="small" type="success" plain @click="createEnv"
           >创建空环境</el-button
         >
-        <el-button size="small" type="info" plain @click="exportCurrentEnv"
+        <el-button size="small" type="info" plain :disabled="!env || env === '未选择'" @click="exportCurrentEnv"
           >导出当前环境</el-button
         >
         <el-button size="small" type="warning" plain @click="importEnvDialog"
           >导入环境配置</el-button
         >
-        <el-button size="small" type="danger" plain @click="delEnv"
+        <el-button size="small" type="danger" plain :disabled="!env || env === '未选择'" @click="delEnv"
           >删除当前环境</el-button
         >
       </el-space>
     </el-popover>
+    <EnvGroupDialog v-model="groupVisible" :environment="groupEnvironment" :teams="teams" @saved="fresh" />
   </div>
 </template>
 
 <script>
-import { fetchEnvs, saveEnv, deleteEnv, exportEnv, importEnv } from "../api";
+import { fetchEnvs, saveEnv, deleteEnv, exportEnv, importEnv, fetchTeams } from "../api";
 import dataCenter from "../dataCenter";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { confirmDelete } from "../utils";
+import EnvGroupDialog from './EnvGroupDialog.vue';
 
 export default {
   name: "env-switch",
+  components: { EnvGroupDialog },
   data() {
     return {
       env: dataCenter.env.value || "未选择",
       list: [],
+      teams: [],
+      teamId: null,
+      groupVisible: false,
+      groupEnvironment: null,
     };
   },
   created() {
     this.fresh();
   },
+  computed: {
+    isAdmin() { return dataCenter.role.value === 'superadmin'; },
+    currentEnvironment() { return this.list.find(item => item.name === this.env); },
+  },
   methods: {
     fresh() {
-      fetchEnvs().then((resp) => {
+      return Promise.all([fetchEnvs(), fetchTeams()]).then(([resp, teams]) => {
         this.list = resp;
+        this.teams = teams || [];
+        if (!this.teams.some(team => team.id === this.teamId)) this.teamId = this.teams.length === 1 ? this.teams[0].id : null;
         dataCenter.envList.value = resp;
-      });
+        if (!resp.some(item => item.name === dataCenter.env.value)) {
+          const next = resp[0]?.name || null;
+          if (dataCenter.env.value) this.changeEnv(next);
+          else {
+            dataCenter.setEnv(next);
+            this.env = next || '未选择';
+          }
+        }
+      }).catch(() => {});
     },
+    openGroupDialog() { this.groupEnvironment = this.currentEnvironment; this.groupVisible = true; },
     changeEnv(env) {
       if (this.env === env) return;
       this.env = env;
@@ -66,6 +92,7 @@ export default {
       window.location.reload();
     },
     cloneEnv() {
+      if (!this.teamId) return ElMessage.error('请选择新环境所属分组');
       ElMessageBox.prompt(
         "请输入新环境名字(只能由英文、数字、下划线和中划线组成)",
         "克隆环境",
@@ -78,10 +105,11 @@ export default {
           ElMessage.error(`[${value}]环境已存在`);
           return;
         }
-        saveEnv(value, this.env).then(() => this.changeEnv(value));
+        saveEnv(value, this.env, this.teamId).then(() => this.changeEnv(value));
       });
     },
     createEnv() {
+      if (!this.teamId) return ElMessage.error('请选择新环境所属分组');
       ElMessageBox.prompt(
         "请输入新环境名字(只能由英文、数字、下划线和中划线组成)",
         "创建环境",
@@ -94,7 +122,7 @@ export default {
           ElMessage.error(`[${value}]环境已存在`);
           return;
         }
-        saveEnv(value).then(() => this.changeEnv(value));
+        saveEnv(value, undefined, this.teamId).then(() => this.changeEnv(value));
       });
     },
     delEnv() {
@@ -127,6 +155,7 @@ export default {
       });
     },
     importEnvDialog() {
+      if (!this.teamId) return ElMessage.error('请选择新环境所属分组');
       ElMessageBox.prompt(
         "请输入新环境名字(只能由英文、数字、下划线和中划线组成)",
         "导入环境配置",
@@ -152,7 +181,7 @@ export default {
             return;
           }
           
-          importEnv(value, file).then(() => {
+          importEnv(value, file, this.teamId).then(() => {
             ElMessage.success('环境配置导入成功');
             this.changeEnv(value);
           }).catch((error) => {
@@ -169,10 +198,9 @@ export default {
 </script>
 
 <style>
-#env-switch {
-  position: fixed;
-  left: 0;
-  bottom: 0;
-  z-index: 999;
-}
+#env-switch { display: inline-flex; }
+.env-option { display: flex; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; }
+.env-option > span { overflow: hidden; text-overflow: ellipsis; }
+.env-team { font-size: 12px; color: #909399; }
+.current-group, .new-group-label { padding: 8px 0; font-size: 12px; color: #606b78; line-height: 1.5; }
 </style>

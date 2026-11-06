@@ -2,18 +2,33 @@
 const Controller = require("egg").Controller;
 const broadcast = require("../service/broadcast");
 const { v4: uuidv4 } = require("uuid");
+const access = require('../service/access');
 
 class WSController extends Controller {
   async connect() {
     const { ctx, app } = this;
     const { websocket } = ctx;
-    broadcast.init(websocket);
+    try {
+      const token = ctx.query.token;
+      const decoded = app.jwt.verify(token, app.config.jwt.secret);
+      if (!access.user(decoded.username) || access.user(decoded.username).disabled) throw new Error('用户不可用');
+      broadcast.init(websocket, decoded.username);
+    } catch (err) { websocket.close(); }
   }
 
   async terminal() {
     const { ctx } = this;
     const { websocket } = ctx;
+    let decoded;
+    try {
+      decoded = ctx.app.jwt.verify(ctx.query.token, ctx.app.config.jwt.secret);
+      if (!access.canAccess(decoded.username, ctx.params.env)) throw new Error('无权访问');
+    } catch (err) { websocket.close(); return; }
     const sessionId = uuidv4();
+    const permissionTimer = setInterval(() => {
+      if (!access.canAccess(decoded.username, ctx.params.env)) websocket.close();
+    }, 5000);
+    permissionTimer.unref();
 
     console.log("[Terminal] 新的终端WebSocket连接:", sessionId);
     console.log("[Terminal] 客户端地址:", ctx.request.ip);
@@ -61,6 +76,7 @@ class WSController extends Controller {
 
     // 监听WebSocket关闭
     websocket.on("close", () => {
+      clearInterval(permissionTimer);
       console.log(`[Terminal] WebSocket连接关闭 [${sessionId}]`);
       ctx.service.terminal.closeSession(sessionId);
     });

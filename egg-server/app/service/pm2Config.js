@@ -2,13 +2,35 @@ module.exports = {
   apps: [
     {
       name: 'deployer',
-      script: 'app.js', // 修改为你的入口文件
-      instances: 1, // 运行实例的数量
-      exec_mode: 'fork', // 运行模式，可以选择 fork 或 cluster
-      watch: true, // 是否监听文件变化，用于自动重启
+      cwd: require('path').resolve(__dirname, '../..'),
+      script: 'scripts/start.js',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      autorestart: true,
+      wait_ready: true,
+      listen_timeout: 30000,
+      kill_timeout: 10000,
+      treekill: false,
       env: {
         NODE_ENV: 'production',
-        PORT: 80,
+        EGG_SERVER_ENV: 'prod',
+      },
+    },
+    {
+      name: 'deployer-updater',
+      cwd: require('path').resolve(__dirname, '../..'),
+      script: 'scripts/upgrade.js',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      autorestart: false,
+      max_restarts: 0,
+      env: {
+        NODE_ENV: 'production',
+        EGG_SERVER_ENV: 'prod',
+        // Explicitly replace the previous task's value when PM2 reuses this app.
+        UPGRADE_VERSION: process.env.UPGRADE_VERSION || '',
       },
     },
   ],

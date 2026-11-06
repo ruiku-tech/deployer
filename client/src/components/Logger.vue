@@ -1,249 +1,64 @@
 <template>
-  <div class="right">
-    <div class="deploying">
-      <div class="title">部署中</div>
-      <el-popover placement="bottom" trigger="click" :width="300">
-        <template #reference>
-          <el-button size="small" style="margin-right: 10px">
-            监听环境 ({{ envList.length }})
-          </el-button>
-        </template>
-        <el-checkbox-group v-model="envList" style="display: flex; flex-direction: column">
-          <el-checkbox
-            v-for="env in dataCenter.envList"
-            :label="env"
-            :key="env.name"
-            style="margin: 5px 0"
-          >
-            {{ env.name }}
-          </el-checkbox>
-        </el-checkbox-group>
-      </el-popover>
-      <el-popover placement="bottom" trigger="click" :width="300">
-        <template #reference>
-          <el-button size="small" type="info">
-            活动连接 ({{ deployings.length }})
-          </el-button>
-        </template>
-        <div style="display: flex; flex-direction: column; gap: 5px">
-          <el-button
-            v-for="deploying in deployings"
-            :key="deploying"
-            size="small"
-            type="danger"
-            plain
-            @click="stop(deploying)"
-          >
-            {{ deploying }} (点击停止)
-          </el-button>
-          <div v-if="deployings.length === 0" style="color: #999; text-align: center; padding: 10px">
-            暂无活动连接
-          </div>
-        </div>
-      </el-popover>
+  <div class="logger">
+    <div class="servers">
+      <span v-if="!servers.length" class="empty">当前没有部署日志</span>
+      <div v-for="host in servers" :key="host" class="server" :class="{ selected: selected === host }" @click="selected = host">
+        <span>{{ host }}</span><span v-if="deployings.includes(host)" class="running">部署中</span>
+        <el-tooltip v-if="deployings.includes(host)" content="取消此服务器的部署"><el-button link type="danger" @click.stop="stop(host)">×</el-button></el-tooltip>
+      </div>
+      <el-button text @click="clearLog">清空当前日志</el-button>
     </div>
-    <div id="logger" @contextmenu.prevent="showContextMenu"></div>
-    <!-- 右键菜单 -->
-    <el-dropdown
-      ref="contextMenu"
-      trigger="contextmenu"
-      :style="{ position: 'fixed', left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px', display: contextMenuVisible ? 'block' : 'none' }"
-    >
-      <span></span>
-      <template #dropdown>
-        <el-dropdown-menu>
-          <el-dropdown-item @click="clearLog">清空日志 (Ctrl+K)</el-dropdown-item>
-          <el-dropdown-item @click="updateDialogVisible = true">版本管理 (Ctrl+U)</el-dropdown-item>
-        </el-dropdown-menu>
-      </template>
-    </el-dropdown>
-    <!-- 版本管理弹窗 -->
-    <UpdateDialog v-model="updateDialogVisible" />
+    <pre ref="output" class="log-output">{{ (logs[selected] || []).join('\n') }}</pre>
   </div>
 </template>
-
 <script>
-import { getDeployings, stopDeploy } from "../api";
-import dataCenter from "../dataCenter";
-import { confirmDelete } from "../utils";
-import dayjs from "dayjs";
-import UpdateDialog from "./UpdateDialog.vue";
-
+import { getDeployings, stopDeploy } from '../api';
+import dataCenter from '../dataCenter';
+import { confirmDelete } from '../utils';
 export default {
-  name: "logger",
-  components: { UpdateDialog },
-  data() {
-    return {
-      deployings: [],
-      dataCenter,
-      envList: [{ name: dataCenter.env.value }],
-      contextMenuVisible: false,
-      contextMenuPosition: { x: 0, y: 0 },
-      updateDialogVisible: false,
-    };
+  data() { return { dataCenter, deployings: [], logs: {}, selected: '', ws: null, timer: null, heartbeat: null, reconnect: null, closing: false }; },
+  computed: {
+    servers() { return [...new Set([...this.deployings, ...Object.keys(this.logs)])]; },
+    tokenValue() { return dataCenter.token.value; },
+    currentEnv() { return dataCenter.env.value; },
   },
-  mounted() {
-    this.logger = document.getElementById("logger");
-    this.hearter = 0;
-    this.connect();
-    document.addEventListener("keyup", this.onKeyUp);
-    document.addEventListener("click", this.hideContextMenu);
-    this.loopSyncDeploying();
+  mounted() { if (dataCenter.token.value) this.connect(); this.syncDeploying(); this.timer = setInterval(this.syncDeploying, 5000); },
+  watch: {
+    tokenValue(token) { if (token && !this.ws) this.connect(); if (!token && this.ws) { this.closing = true; this.ws.close(); this.ws = null; } },
+    currentEnv(next, previous) { if (next !== previous) { this.logs = {}; this.deployings = []; this.selected = ''; this.syncDeploying(); } },
   },
-  beforeUnmount() {
-    document.removeEventListener("keyup", this.onKeyUp);
-    document.removeEventListener("click", this.hideContextMenu);
-    if (this.timer) {
-      clearInterval(this.timer);
-    }
-    if (this.hearter) {
-      clearInterval(this.hearter);
-    }
-  },
+  beforeUnmount() { this.closing = true; clearInterval(this.timer); clearInterval(this.heartbeat); clearTimeout(this.reconnect); if (this.ws) this.ws.close(); },
   methods: {
-    stop(host) {
-      confirmDelete(`确定停止${host}的部署？`).then(() => {
-        stopDeploy(host).then(() => {
-          this.loopSyncDeploying();
-        });
-      });
-    },
-    loopSyncDeploying() {
-      if (this.timer) {
-        clearInterval(this.timer);
-      }
-      this.timer = setInterval(this.syncDeploying, 10000);
-    },
-    syncDeploying() {
-      if (dataCenter.token.value) {
-        getDeployings().then((list) => (this.deployings = list));
-      }
-    },
-    onKeyUp(e) {
-      if (e.ctrlKey && e.code === "KeyK") {
-        this.clearLog();
-      } else if (e.ctrlKey && e.code === "KeyU") {
-        this.updateDialogVisible = true;
-      }
-    },
+    syncDeploying() { if (dataCenter.env.value) getDeployings().then(list => { this.deployings = list; if (!this.selected && list.length) this.selected = list[0]; }).catch(() => {}); },
+    stop(host) { confirmDelete(`确定取消 ${host} 的部署？`).then(() => stopDeploy(host)).then(this.syncDeploying).catch(() => {}); },
+    clearLog() { if (this.selected) this.logs[this.selected] = []; },
     connect() {
-      const baseUrl = process.env.VUE_APP_SERVER;
-      let wsUrl = baseUrl.replace("http", "ws");
-      // 兼容测试环境和正式环境
-      if (!baseUrl.startsWith("http")) {
-        wsUrl = "ws://" + location.host + baseUrl;
-      }
-      var ws = new WebSocket(wsUrl);
-      ws.onmessage = (e) => {
-        if (e.data) {
-          this.addLog(e.data);
-        }
+      const base = process.env.VUE_APP_SERVER || '/deploy';
+      const url = new URL(base, window.location.origin);
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      url.searchParams.set('token', dataCenter.token.value);
+      const ws = this.ws = new WebSocket(url.toString());
+      ws.onmessage = event => {
+        const match = /^环境:([^:]+):(\w+):\[([^\]]+)\]\s?([\s\S]*)$/.exec(event.data);
+        if (!match || match[1] !== dataCenter.env.value) return;
+        const host = match[3];
+        if (!this.logs[host]) this.logs[host] = [];
+        this.logs[host].push(`[${match[2]}] ${match[4]}`);
+        if (this.logs[host].length > 5000) this.logs[host].shift();
+        if (!this.selected) this.selected = host;
+        this.$nextTick(() => { const output = this.$refs.output; if (output) output.scrollTop = output.scrollHeight; });
       };
-      ws.onclose = () => {
-        clearInterval(this.hearter);
-        this.hearter = 0;
-        this.addLog("ERR:链接端口，2秒后重连");
-        setTimeout(this.connect, 2000);
-      };
-      if (!this.hearter) {
-        this.hearter = setInterval(() => {
-          if (ws.readyState === 1) {
-            ws.send("0");
-          }
-        }, 5000);
-      }
-    },
-    addLog(info) {
-      const log = info.split(":");
-      var line = document.createElement("pre");
-      line.className = `item ${log[0] == "环境" ? log[2] : log[0]}`;
-      if (this.envList.find((obj) => obj.name === log[1]) || log[0] != "环境") {
-        if (log[2] === "NORM") {
-          line.textContent = `${log.slice(1).join(":")} @${dayjs().format(
-            "MM-DD hh:mm:ss"
-          )}`;
-        } else {
-          line.textContent = log.slice(1).join(":");
-        }
-        this.logger.appendChild(line);
-        this.logger.scrollTo(0, this.logger.scrollHeight);
-      }
-    },
-    showContextMenu(e) {
-      this.contextMenuPosition = { x: e.pageX, y: e.pageY };
-      this.contextMenuVisible = true;
-    },
-    hideContextMenu() {
-      this.contextMenuVisible = false;
-    },
-    clearLog() {
-      this.logger.innerHTML = "";
-      this.hideContextMenu();
+      ws.onclose = () => { clearInterval(this.heartbeat); if (!this.closing) this.reconnect = setTimeout(this.connect, 2000); };
+      this.heartbeat = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('0'); }, 5000);
     },
   },
 };
 </script>
-
-<!-- Add "scoped" attribute to limit CSS to this component only -->
-<style>
-.right {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  flex: 1;
-}
-
-.deploying {
-  height: 36px;
-  display: flex;
-  flex-direction: row;
-  border: 1px solid #eee;
-}
-
-.deploying .title {
-  padding: 0 10px;
-  background: #f0f0f0;
-  border-right: 1px solid #eee;
-  display: flex;
-  align-items: center;
-  margin-right: 10px;
-}
-
-.deploying .list {
-  flex: 1;
-  overflow-x: scroll;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
-#logger {
-  flex: 1;
-  background-color: #000;
-  color: #eee;
-  overflow: scroll;
-  margin-top: 10px;
-  padding: 10px;
-  box-sizing: border-box;
-}
-
-#logger .item {
-  padding: 0 2px;
-  text-align: left;
-  font-size: 12px;
-  background: #222;
-  border-radius: 2px;
-  margin: 1px 0;
-}
-
-#logger .ERR {
-  color: #ee0000;
-}
-
-#logger .NORM {
-  color: #0e0;
-}
-
-/* 版本确认对话框样式（已迁移到 UpdateDialog.vue，保留注释） */
+<style scoped>
+.logger { height: 60vh; display: flex; flex-direction: column; }
+.servers { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 12px; }
+.server { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid #dcdfe6; border-radius: 4px; cursor: pointer; }
+.server.selected { border-color: #409eff; color: #337ecc; background: #ecf5ff; }
+.running { color: #198754; font-size: 12px; }.empty { color: #909399; font-size: 13px; }
+.log-output { flex: 1; overflow: auto; margin: 0; padding: 16px; background: #19212b; color: #e0e7ed; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.6 monospace; }
 </style>

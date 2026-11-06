@@ -17,6 +17,8 @@ service.interceptors.request.use(
     const token = dataCenter.token.value;
     if (token) {
       config.headers.Authorization = token;
+    } else {
+      delete config.headers.Authorization;
     }
     return config;
   },
@@ -26,6 +28,21 @@ service.interceptors.request.use(
 );
 let loading = null;
 let loadCount = 0;
+
+function tokenExpiry(token) {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(payload)).exp || 0;
+  } catch { return 0; }
+}
+
+function renewSession(response) {
+  const token = response?.headers?.['x-access-token'];
+  const current = dataCenter.token.value;
+  // Ignore an old response after logout/login, or a concurrent older renewal.
+  if (token && current && response.config.headers.Authorization === current &&
+      tokenExpiry(token) > tokenExpiry(current)) dataCenter.setToken(token);
+}
 
 function startLoad() {
   loadCount++;
@@ -60,6 +77,7 @@ service.interceptors.request.use((config) => {
 });
 service.interceptors.response.use(
   (response) => {
+    renewSession(response);
     if (!response.config.headers.nofeel) {
       endLoad();
     }
@@ -87,13 +105,15 @@ service.interceptors.response.use(
     return data.data;
   },
   (err) => {
-    endLoad();
-    const errorMessage = err.message || JSON.stringify(err);
-    if (err.response.status === 401) {
-      console.log("token失效");
-
-      localStorage.removeItem("token");
-      dataCenter.token.value = "";
+    renewSession(err.response);
+    if (!err.config?.headers?.nofeel) endLoad();
+    const errorMessage = err.response?.data?.message || err.response?.data?.err || err.message || JSON.stringify(err);
+    if (err.response?.status === 401) {
+      // A late failure from an older request must not clear a renewed session.
+      if (err.config?.headers?.Authorization !== dataCenter.token.value) {
+        return Promise.reject(new Error(errorMessage));
+      }
+      dataCenter.setToken('');
       ElMessage.error(errorMessage);
       return Promise.reject(new Error(errorMessage));
     }

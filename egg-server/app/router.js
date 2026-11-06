@@ -179,21 +179,6 @@ module.exports = (app) => {
     controller.deploy.deleteDeploying
   );
 
-  // 申请证书
-  router.post(
-    "/deploy/deploy-ssl",
-    auth,
-    deployMiddle,
-    controller.deploy.postDeploySsl
-  );
-
-  router.get(
-    "/deploy/api_auto",
-    auth,
-    deployMiddle,
-    controller.deploy.getApiAuto
-  );
-
   // 注册
   router.post("/deploy/register", controller.deploy.postRegister);
   // 登陆
@@ -220,6 +205,19 @@ module.exports = (app) => {
   );
   // 获取环境列表
   router.get("/deploy/env/list", auth, controller.env.getList);
+  router.put('/deploy/env/team', auth, controller.env.setTeam);
+  router.get('/deploy/disk', auth, async ctx => {
+    ctx.body = { data: await require('./service/disk').usage(require('./service/config').workspace) };
+  });
+  router.get('/deploy/me', auth, controller.team.me);
+  router.get('/deploy/teams', auth, controller.team.list);
+  router.get('/deploy/users', auth, controller.team.users);
+  router.post('/deploy/team', auth, controller.team.save);
+  router.post('/deploy/user', auth, controller.team.setUser);
+  router.get('/deploy/schedules', auth, controller.schedule.list);
+  router.post('/deploy/schedule/cancel', auth, controller.schedule.cancel);
+  router.get('/deploy/notes', auth, deployMiddle, controller.deploy.getResourceNotes);
+  router.post('/deploy/note', auth, deployMiddle, controller.deploy.postResourceNote);
   // 新建环境
   router.post("/deploy/env/one", auth, controller.env.postOne);
   // 删除配置
@@ -278,6 +276,7 @@ module.exports = (app) => {
               return;
             }
 
+            if (database.findUsers().length) return; // 注册完成后不再覆盖成员数据。
             database.importMigrationData({
               users: mongoUsers,
               records,

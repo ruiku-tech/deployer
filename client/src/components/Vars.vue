@@ -17,6 +17,7 @@
                 </el-form-item>
               </el-col>
             </el-form-item>
+            <el-form-item label="备注" prop="note"><el-input v-model="form.note" /></el-form-item>
             <el-form-item>
               <el-button type="primary" @click="save">保存</el-button>
               <el-button @click="reset">重置</el-button>
@@ -33,7 +34,7 @@
         </div>
       </template>
       <el-table :data="list" style="width: 100%">
-        <el-table-column prop="name" label="名字" />
+        <el-table-column prop="name" label="名字"><template #default="scope">{{ scope.row.name }} <el-tooltip v-if="scope.row.note" :content="scope.row.note"><span class="note-icon">?</span></el-tooltip></template></el-table-column>
         <el-table-column prop="value" label="值" width="200" />
         <el-table-column label="操作" width="120">
           <template #default="scope">
@@ -51,7 +52,7 @@
 </template>
 
 <script>
-import { fetchVars, saveVars } from "../api";
+import { fetchVars, saveVars, fetchNotes, saveNote } from "../api";
 import { ElMessage } from "element-plus";
 import { confirmDelete } from "../utils";
 
@@ -63,6 +64,7 @@ export default {
       form: {
         name: "",
         value: "",
+        note: "",
       },
       collapse: [],
     };
@@ -72,12 +74,12 @@ export default {
   },
   methods: {
     fresh() {
-      fetchVars().then((data) => {
+      Promise.all([fetchVars(), fetchNotes('var')]).then(([data, notes]) => {
         this.list = data
-          .split("\n")
+          .split("\n").filter(Boolean)
           .map((line) => {
             const info = line.split(">>");
-            return { name: info[0], value: info[1] };
+            return { name: info[0], value: info.slice(1).join('>>'), note: notes?.[info[0]] || '' };
           })
           .sort((a, b) => (a.name > b.name ? 1 : -1));
       });
@@ -87,12 +89,13 @@ export default {
         const list = this.list.filter((the) => {
           return the.name !== item.name;
         });
-        this.requestSave(list);
+        this.requestSave(list).then(() => saveNote('var', item.name, ''));
       });
     },
     edit(item) {
       this.form.name = item.name;
       this.form.value = item.value;
+      this.form.note = item.note || '';
       this.collapse = ["1"];
     },
     save() {
@@ -104,7 +107,7 @@ export default {
       }
       const list = this.list.concat();
       list.push(Object.assign({}, this.form));
-      this.requestSave(list).then(() => {
+      this.requestSave(list).then(() => saveNote('var', this.form.name, this.form.note)).then(this.fresh).then(() => {
         this.reset();
       });
     },

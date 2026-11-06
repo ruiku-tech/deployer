@@ -1,6 +1,6 @@
 /* eslint valid-jsdoc: "off" */
 const path = require("path");
-const crypto = require("crypto");
+const session = require("../app/service/session");
 /**
  * @param {Egg.EggAppInfo} appInfo app info
  */
@@ -24,14 +24,16 @@ module.exports = (appInfo) => {
     },
   };
   config.jwt = {
-    secret: process.env.DEPLOY_JWT || crypto.randomBytes(32).toString("hex"),
+    secret: session.signingSecret(),
     expiresIn: "120m",
+    renewBeforeSeconds: 30 * 60,
   };
 
   config.cors = {
     origin: "*", // 允许所有来源请求，如果只允许特定来源，可以替换为具体的 URL，例如 'http://192.168.31.79:8080'
     allowMethods: "GET,HEAD,PUT,POST,DELETE,PATCH,OPTIONS",
     allowHeaders: "*", // 确保包含 'env'
+    exposeHeaders: ["X-Access-Token"],
     credentials: true, // 如果需要支持跨域 cookie
   };
   // add your user config here

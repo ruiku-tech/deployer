@@ -15,6 +15,7 @@
                 placeholder="put: [FILE:文件名字],/root/dir \n run: docker run server -config [CONF:配置名字] --host [HOST:服务器名字] [VAR:变量]"
               />
             </el-form-item>
+            <el-form-item label="备注" prop="note"><el-input v-model="form.note" /></el-form-item>
             <el-form-item>
               <el-button type="primary" @click="save()">保存</el-button>
               <el-button @click="reset()">重置</el-button>
@@ -32,7 +33,7 @@
         </div>
       </template>
       <el-table :data="list" style="width: 100%">
-        <el-table-column prop="name" label="脚本名字" />
+        <el-table-column prop="name" label="脚本名字"><template #default="scope">{{ scope.row.name }} <el-tooltip v-if="scope.row.note" :content="scope.row.note"><span class="note-icon">?</span></el-tooltip></template></el-table-column>
         <el-table-column label="操作" width="240">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="edit(scope.row)">修改</el-button>
@@ -111,6 +112,7 @@ export default {
       form: {
         name: "",
         data: "",
+        note: "",
       },
       collapse: [],
       formLabelWidth: "90px",
@@ -142,6 +144,7 @@ export default {
       });
     },
     edit(item) {
+      this.form.note = item.note || '';
       fetchScript(item.name).then((data) => {
         this.form.name = item.name;
         this.form.data = data;
@@ -155,7 +158,7 @@ export default {
       if (!this.form.data) {
         return ElMessage.error("请输入脚本内容");
       }
-      saveScript(this.form.name, this.form.data)
+      saveScript(this.form.name, this.form.data, this.form.note)
         .then(this.fresh)
         .then(this.reset);
     },
@@ -207,4 +210,5 @@ export default {
 </script>
 
 <style scoped>
+.note-icon { display: inline-flex; justify-content: center; align-items: center; width: 15px; height: 15px; border: 1px solid #a8abb2; border-radius: 50%; color: #909399; font-size: 11px; cursor: help; }
 </style>

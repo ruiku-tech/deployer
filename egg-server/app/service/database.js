@@ -6,7 +6,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.resolve(__dirname, '../../data/deployer.db');
+const DB_PATH = path.resolve(process.env.DEPLOY_DB_PATH || path.resolve(__dirname, '../../data/deployer.db'));
 
 // 确保 data 目录存在
 const dataDir = path.dirname(DB_PATH);
@@ -82,6 +82,18 @@ function initTables() {
       value TEXT
     )
   `);
+  d.exec(`CREATE TABLE IF NOT EXISTS resource_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    env TEXT NOT NULL,
+    type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    note TEXT DEFAULT '',
+    UNIQUE(env, type, name)
+  )`);
+  d.exec(`CREATE TABLE IF NOT EXISTS env_script_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, env TEXT NOT NULL, text TEXT NOT NULL,
+    uploadTime INTEGER NOT NULL, UNIQUE(env,text)
+  )`);
 }
 
 // ===== User 操作 =====
@@ -91,6 +103,7 @@ function findUsers(query = {}) {
   const conditions = [];
   const params = [];
   for (const [ key, val ] of Object.entries(query)) {
+    if (!['id', 'username', 'password', 'role', 'disabled'].includes(key)) continue;
     conditions.push(`${key} = ?`);
     params.push(val);
   }
@@ -160,7 +173,7 @@ function deleteRecord(item) {
   const conditions = [];
   const params = [];
   for (const [ key, val ] of Object.entries(item)) {
-    if (key === '_id') continue;
+    if (!['cmds', 'host', 'name', 'username', 'time', 'env'].includes(key)) continue;
     if (key === 'cmds') {
       conditions.push('cmds = ?');
       params.push(JSON.stringify(val));
@@ -195,26 +208,28 @@ function findOneFileMemo(fileName) {
 
 // ===== ScriptRecord 操作 =====
 
-function createScriptRecord({ text }) {
+function createScriptRecord({ text, env }) {
   const d = getDb();
   try {
     return d.prepare(
-      'INSERT OR IGNORE INTO script_records (text, uploadTime) VALUES (?, ?)'
-    ).run(text, Date.now());
+      'INSERT OR IGNORE INTO env_script_records (env, text, uploadTime) VALUES (?, ?, ?)'
+    ).run(env, text, Date.now());
   } catch (e) {
     // unique constraint - ignore
     return null;
   }
 }
 
-function findScriptRecords() {
+function findScriptRecords(env, includeLegacy = false) {
   const d = getDb();
-  return d.prepare('SELECT * FROM script_records ORDER BY uploadTime DESC').all();
+  const rows = d.prepare('SELECT * FROM env_script_records WHERE env=? ORDER BY uploadTime DESC').all(env);
+  return includeLegacy ? rows.concat(d.prepare('SELECT * FROM script_records ORDER BY uploadTime DESC').all()).sort((a, b) => b.uploadTime - a.uploadTime) : rows;
 }
 
-function deleteScriptRecord(text) {
+function deleteScriptRecord(text, env, includeLegacy = false) {
   const d = getDb();
-  return d.prepare('DELETE FROM script_records WHERE text = ?').run(text);
+  if (includeLegacy) d.prepare('DELETE FROM script_records WHERE text = ?').run(text);
+  return d.prepare('DELETE FROM env_script_records WHERE text=? AND env=?').run(text, env);
 }
 
 // ===== Meta 操作 =====
@@ -228,6 +243,16 @@ function getMeta(key) {
 function setMeta(key, value) {
   const d = getDb();
   d.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(key, value);
+}
+
+function getNote(env, type, name) {
+  return getDb().prepare('SELECT note FROM resource_notes WHERE env = ? AND type = ? AND name = ?').get(env, type, name)?.note || '';
+}
+function listNotes(env, type) {
+  return getDb().prepare('SELECT name, note FROM resource_notes WHERE env = ? AND type = ?').all(env, type);
+}
+function setNote(env, type, name, note) {
+  return getDb().prepare('INSERT INTO resource_notes (env, type, name, note) VALUES (?, ?, ?, ?) ON CONFLICT(env, type, name) DO UPDATE SET note=excluded.note').run(env, type, name, note || '');
 }
 
 // ===== 迁移操作 =====
@@ -254,6 +279,7 @@ function importMigrationData({ users = [], records = [], fileMemos = [], scriptR
 
   const tx = d.transaction(() => {
     // 清空现有数据
+    d.prepare("DELETE FROM meta WHERE key='teams_migrated'").run();
     d.exec('DELETE FROM users');
     d.exec('DELETE FROM records');
     d.exec('DELETE FROM file_memos');
@@ -331,6 +357,9 @@ module.exports = {
   setDbVersion,
   isMigrated,
   setMigrated,
+  getNote,
+  listNotes,
+  setNote,
   importMigrationData,
   close,
   DB_PATH,

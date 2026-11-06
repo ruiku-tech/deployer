@@ -19,9 +19,10 @@
                 :rows="2"
                 autosize
                 v-model="form.password"
-                placeholder="如果长度大于32位则自动识别为密钥"
+                placeholder="修改时留空保留原密码；长度大于32位识别为密钥"
               />
             </el-form-item>
+            <el-form-item label="备注" prop="note"><el-input v-model="form.note" /></el-form-item>
             <el-form-item>
               <el-button type="primary" @click="save">保存</el-button>
               <el-button @click="reset">重置</el-button>
@@ -38,7 +39,7 @@
         </div>
       </template>
       <el-table :data="list" style="width: 100%">
-        <el-table-column prop="name" label="名字" />
+        <el-table-column prop="name" label="名字"><template #default="scope">{{ scope.row.name }} <el-tooltip v-if="scope.row.note" :content="scope.row.note"><span class="note-icon">?</span></el-tooltip></template></el-table-column>
         <el-table-column prop="host" label="IP" width="200" />
         <el-table-column prop="password" label="密码/密钥" width="200" />
         <el-table-column prop="port" label="端口" width="80" />
@@ -76,7 +77,7 @@
 </template>
 
 <script>
-import { fetchHosts, saveHosts, deleteHosts } from "../api";
+import { fetchHosts, saveHosts, deleteHosts, fetchNotes, saveNote } from "../api";
 import { ElMessage } from "element-plus";
 import { confirmDelete } from "../utils";
 import DraggableTerminal from "./DraggableTerminal.vue";
@@ -96,8 +97,10 @@ export default {
         host: "",
         port: "",
         password: "",
+        note: "",
       },
       collapse: [],
+      editingName: '',
       terminals: [],
       nextTerminalId: 1,
       maxZIndex: 1000,
@@ -108,7 +111,7 @@ export default {
   },
   methods: {
     fresh() {
-      fetchHosts().then((data) => {
+      Promise.all([fetchHosts(), fetchNotes('host')]).then(([data, notes]) => {
         this.list = Object.entries(data)
           .map(([name, value]) => {
             const info = value.split(":");
@@ -117,6 +120,7 @@ export default {
               host: info[0],
               password: info[1],
               port: info[2] || '22',
+              note: notes?.[name] || '',
             };
           })
           .sort((a, b) => (a.host === b.host ? 0 : a.host > b.host ? 1 : -1));
@@ -124,14 +128,16 @@ export default {
     },
     del(item) {
       confirmDelete().then(() => {
-        deleteHosts(item.name).then(this.fresh);
+        deleteHosts(item.name).then(() => saveNote('host', item.name, '')).then(this.fresh);
       });
     },
     edit(item) {
+      this.editingName = item.name;
       this.form.name = item.name;
       this.form.host = item.host;
       this.form.port = item.port;
-      this.form.password = "";
+      this.form.password = '';
+      this.form.note = item.note || '';
       this.collapse = ["1"];
     },
     save() {
@@ -141,10 +147,10 @@ export default {
       if (!this.form.host) {
         return ElMessage.error("请输入服务器ip");
       }
-      if (!this.form.password) {
+      if (!this.form.password && this.editingName !== this.form.name) {
         return ElMessage.error("请输入服务器密码或密钥");
       }
-      if (this.form.password.length < 4) {
+      if (this.form.password && this.form.password.length < 4) {
         return ElMessage.error("密码或密钥太短");
       }
       this.requestSave([Object.assign({}, this.form)]).then(() => {
@@ -152,6 +158,7 @@ export default {
       });
     },
     reset() {
+      this.editingName = '';
       this.$refs.formRef.resetFields();
     },
     requestSave(list) {
@@ -159,9 +166,8 @@ export default {
         ret[item.name] = `${item.host}:${item.password}:${item.port.trim()}`;
         return ret;
       }, {});
-      console.log(data);
 
-      return saveHosts(data).then(this.fresh);
+      return saveHosts(data).then(() => saveNote('host', this.form.name, this.form.note)).then(this.fresh);
     },
     openTerminal(item) {
       // 检查是否已经打开了相同服务器的终端

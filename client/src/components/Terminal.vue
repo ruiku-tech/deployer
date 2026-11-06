@@ -94,7 +94,7 @@ export default {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       // 使用 location.host 包含了主机名和端口
       const env = dataCenter.env.value;
-      const wsUrl = `${protocol}//${window.location.host}/terminal/${env}`;
+      const wsUrl = `${protocol}//${window.location.host}/terminal/${encodeURIComponent(env)}?token=${encodeURIComponent(dataCenter.token.value)}`;
 
       this.terminal.writeln("正在连接到服务器...");
       console.log('[Terminal] 连接WebSocket:', wsUrl);

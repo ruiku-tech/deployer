@@ -1,6 +1,7 @@
 const fs = require("fs");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const path = require("path");
+const pm2Environment = require("./pm2Environment");
 
 const varSpliter = ">>";
 
@@ -34,23 +35,78 @@ function selfUpdate(version) {
   const versionLabel = version || "最新版本";
   console.log("开始自动升级，目标版本:", versionLabel, "项目路径:", path.resolve(__dirname, "..", ".."));
 
-  // 传入版本号作为环境变量，upgrade.js 会读取并下载指定版本
-  const env = Object.assign({}, process.env);
-  if (version) {
-    env.UPGRADE_VERSION = version;
+  // 由 PM2 单独托管更新进程，宿主服务退出后更新仍可继续执行。
+  const projectDir = path.resolve(__dirname, "..", "..");
+  const pm2Bin = path.join(projectDir, "node_modules", ".bin", "pm2");
+  const pm2Config = path.join(projectDir, "ecosystem.config.js");
+  const submitLock = "/tmp/deployer-updater-submit.lock";
+  const env = Object.assign(pm2Environment(), { UPGRADE_VERSION: version || "" });
+  const updaterIsActive = () => {
+    const result = spawnSync(pm2Bin, ["jlist"], {
+      cwd: projectDir,
+      env,
+      encoding: "utf8",
+      timeout: 3000,
+    });
+    if (result.error || result.status !== 0) return false;
+    try {
+      const processes = JSON.parse(result.stdout);
+      return processes.some(item => item.name === "deployer-updater" &&
+        ["online", "launching", "waiting restart", "stopping"].includes(item.pm2_env?.status));
+    } catch (error) {
+      return false;
+    }
+  };
+  if (updaterIsActive()) {
+    return Promise.reject(new Error("升级任务正在执行，请稍后再试"));
+  }
+  let lockFd;
+  try {
+    // The request handler can be hit twice before PM2 reports the updater online.
+    lockFd = fs.openSync(submitLock, "wx");
+  } catch (error) {
+    if (error.code === "EEXIST") {
+      return Promise.reject(new Error("升级任务正在提交，请勿重复操作"));
+    }
+    return Promise.reject(error);
+  }
+  if (updaterIsActive()) {
+    try { fs.closeSync(lockFd); } catch (e) { /* already closed */ }
+    try { fs.unlinkSync(submitLock); } catch (e) { /* best effort */ }
+    return Promise.reject(new Error("升级任务正在执行，请稍后再试"));
   }
 
-  // 用 process.execPath 拿到 node 绝对路径，避免 daemon 环境 PATH 里没有 npm/node
-  const upgradePath = path.resolve(__dirname, "..", "..", "scripts", "upgrade.js");
-  const npmProcess = spawn(process.execPath, [upgradePath], {
-    cwd: path.resolve(__dirname, "..", ".."),
-    env,
-    detached: true,
-    stdio: "ignore",
-  });
+  return new Promise((resolve, reject) => {
+    const npmProcess = spawn(pm2Bin, [
+      "start",
+      pm2Config,
+      "--only",
+      "deployer-updater",
+      "--update-env",
+    ], {
+      cwd: projectDir,
+      env,
+      detached: true,
+      stdio: "ignore",
+    });
 
-  npmProcess.unref();
-  console.log("升级进程已启动，子进程 PID:", npmProcess.pid);
+    npmProcess.once("error", reject);
+    npmProcess.once("close", (code, signal) => {
+      try { fs.closeSync(lockFd); } catch (e) { /* already closed */ }
+      // The updater removes this marker when it has acquired its process lock.
+      // A failed PM2 submission must release it here so the next request works.
+      if (code !== 0) {
+        try { fs.unlinkSync(submitLock); } catch (e) { /* best effort */ }
+      }
+      if (code === 0) {
+        console.log("PM2 更新进程启动请求已发送，子进程 PID:", npmProcess.pid);
+        resolve();
+      } else {
+        reject(new Error(`PM2 更新进程启动失败${signal ? `（信号 ${signal}）` : `（退出码 ${code}）`}`));
+      }
+    });
+    npmProcess.unref();
+  });
 }
 
 // 获取当前版本

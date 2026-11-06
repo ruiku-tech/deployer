@@ -3,6 +3,7 @@ const path = require('path');
 const { exec } = require('child_process');
 const axios = require('axios').default;
 const { promisify } = require('util');
+const pm2Environment = require('../app/service/pm2Environment');
 
 /**
  * 自动升级脚本
@@ -16,12 +17,17 @@ const execAsync = promisify(exec);
 const projectDir = path.resolve(__dirname, '..');
 const localPath = '/tmp/deployer-release.zip';
 const lockFile = '/tmp/deployer-upgrade.lock';
+const submitLock = '/tmp/deployer-updater-submit.lock';
 const logFile = '/tmp/deployer-upgrade.log';
 const targetVersion = process.env.UPGRADE_VERSION || '';
+const commandEnv = pm2Environment();
+delete commandEnv.UPGRADE_VERSION;
 
 const nodeBin = process.execPath;
 const npmBin = path.join(path.dirname(nodeBin), 'npm');
-const eggScripts = path.join(projectDir, 'node_modules', '.bin', 'egg-scripts');
+const pm2Bin = path.join(projectDir, 'node_modules', '.bin', 'pm2');
+const pm2Config = path.join(projectDir, 'ecosystem.config.js');
+const pm2AppName = 'deployer';
 
 const apiUrl = targetVersion
   ? `https://api.github.com/repos/ruiku-tech/deployer/releases/tags/${targetVersion}`
@@ -40,7 +46,7 @@ function log(msg) {
 async function execLog(cmd, opts) {
   log(`> ${cmd}`);
   try {
-    const { stdout, stderr } = await execAsync(cmd, { ...opts, maxBuffer: 10 * 1024 * 1024 });
+    const { stdout, stderr } = await execAsync(cmd, { env: commandEnv, ...opts, maxBuffer: 10 * 1024 * 1024 });
     if (stdout && stdout.trim()) log(`  stdout: ${stdout.trim()}`);
     if (stderr && stderr.trim()) log(`  stderr: ${stderr.trim()}`);
     return { stdout, stderr };
@@ -54,54 +60,100 @@ async function execLog(cmd, opts) {
 
 /** 防并发锁：确保同一时刻只有一个升级进程在运行 */
 async function acquireLock() {
-  try {
-    const existing = (await fs.promises.readFile(lockFile, 'utf8')).trim();
-    const pid = parseInt(existing);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      process.kill(pid, 0);
-      log(`另一个升级进程正在运行 (PID: ${pid})，本次退出`);
-      process.exit(1);
-    } catch (e) { log('旧锁文件已失效，继续'); }
-  } catch (e) { /* 锁文件不存在，正常 */ }
-  await fs.promises.writeFile(lockFile, String(process.pid));
+      const handle = await fs.promises.open(lockFile, 'wx');
+      await handle.writeFile(String(process.pid));
+      await handle.close();
+      return true;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      const existing = await fs.promises.readFile(lockFile, 'utf8').catch(() => '');
+      const pid = parseInt(existing, 10);
+      if (pid) {
+        try {
+          process.kill(pid, 0);
+          log(`另一个升级进程正在运行 (PID: ${pid})，本次退出`);
+          return false;
+        } catch (probeError) {
+          if (probeError.code !== 'ESRCH') return false;
+        }
+      }
+      await fs.promises.unlink(lockFile).catch(() => {});
+      log('旧锁文件已失效，重试获取');
+    }
+  }
+  return false;
 }
 
-/** 停止并彻底清理所有与本项目相关的 egg 进程 */
-async function stopEgg() {
+/** 通过固定的 PM2 应用名停止服务，避免误杀升级进程或其他 Node 服务。 */
+async function stopService() {
   log('--- 停止服务 ---');
-
-  // 不调用 egg-scripts stop：它内部有 sleep(5s) + ps 查询，在某些 Linux 环境下会永久卡住
-  // 直接用 ps 找出所有属于本项目的 node 进程，SIGKILL 强制清理，效果更可靠
-  const selfPid = process.pid;
-  let pids = [];
   try {
-    const { stdout } = await execAsync(
-      `ps aux | grep node | grep "${projectDir}" | grep -v "upgrade.js" | grep -v grep | awk '{print $2}'`
-    );
-    log(`ps 匹配结果:\n${stdout}`);
-    pids = stdout.trim().split('\n')
-      .map(p => parseInt(p.trim()))
-      .filter(p => p > 0 && p !== selfPid);
-  } catch (e) { log('ps 无匹配'); }
-
-  if (pids.length > 0) {
-    log(`强制 kill -9: ${pids.join(' ')}`);
-    await execAsync(`kill -9 ${pids.join(' ')} 2>/dev/null; true`);
-  } else {
-    log('无相关进程需要清理');
+    await execLog(`"${pm2Bin}" delete "${pm2AppName}"`, { cwd: projectDir });
+  } catch (err) {
+    const output = `${err.stdout || ''}\n${err.stderr || ''}\n${err.message || ''}`;
+    if (/process or namespace .* not found|not found/i.test(output)) {
+      log('PM2 中没有正在运行的服务，继续检查旧版 Egg 服务');
+    } else {
+      throw err;
+    }
   }
+
+  await stopLegacyEgg();
 
   log('等待端口释放 (3s)...');
   await new Promise(resolve => setTimeout(resolve, 3000));
+  log('服务已交由 PM2 停止');
+}
 
-  // 验证进程是否都已退出
+/**
+ * 仅用于从旧版本切换：停止通过 egg-scripts 启动的该项目进程。
+ * 新版本的日常停止与重启只使用 PM2。
+ */
+async function stopLegacyEgg() {
+  let stdout;
   try {
-    const { stdout } = await execAsync(
-      `ps aux | grep node | grep "${projectDir}" | grep -v "upgrade.js" | grep -v grep`
-    );
-    if (stdout.trim()) log(`警告：仍有相关进程存活:\n${stdout.trim()}`);
-    else log('确认：所有相关进程已退出');
-  } catch (e) { log('确认：所有相关进程已退出'); }
+    ({ stdout } = await execAsync('ps -eo pid=,args=', { cwd: projectDir, env: commandEnv }));
+  } catch (err) {
+    log(`检查旧版 Egg 进程失败，继续升级: ${err.message}`);
+    return;
+  }
+
+  const legacyProcesses = stdout.split('\n').map(line => {
+    const match = line.trim().match(/^(\d+)\s+(.*)$/);
+    if (!match) return null;
+    const pid = Number(match[1]);
+    const command = match[2];
+    const isLegacy = command.includes(projectDir) && command.includes('egg-server-server') &&
+      (command.includes('egg-scripts/lib/start-cluster') ||
+        command.includes('egg-cluster/lib/app_worker') ||
+        command.includes('egg-cluster/lib/agent_worker'));
+    return isLegacy && pid !== process.pid ? { pid, command } : null;
+  }).filter(Boolean);
+
+  if (!legacyProcesses.length) {
+    log('没有发现旧版 Egg 守护进程');
+    return;
+  }
+
+  log(`停止旧版 Egg 进程: ${legacyProcesses.map(item => item.pid).join(', ')}`);
+  for (const { pid } of legacyProcesses) {
+    try { process.kill(pid, 'SIGTERM'); } catch (err) {
+      if (err.code !== 'ESRCH') log(`向旧版 Egg 进程 ${pid} 发送 SIGTERM 失败: ${err.message}`);
+    }
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 3000));
+  for (const { pid } of legacyProcesses) {
+    try {
+      process.kill(pid, 0);
+      process.kill(pid, 'SIGKILL');
+      log(`旧版 Egg 进程 ${pid} 未及时退出，已强制停止`);
+    } catch (err) {
+      if (err.code !== 'ESRCH') log(`确认旧版 Egg 进程 ${pid} 状态失败: ${err.message}`);
+    }
+  }
 }
 
 async function run() {
@@ -112,8 +164,12 @@ async function run() {
   log(`node: ${nodeBin}`);
   log(`npm:  ${npmBin}`);
 
-  await acquireLock();
+  try { await fs.promises.unlink(submitLock); } catch (e) { /* no submission marker */ }
+  if (!await acquireLock()) return;
   log('锁已获取，开始升级流程');
+  let serviceStopped = false;
+  let serviceStarted = false;
+  const startCmd = `"${pm2Bin}" startOrRestart "${pm2Config}" --only "${pm2AppName}"`;
 
   try {
     // 1. 查询版本
@@ -129,7 +185,8 @@ async function run() {
     await execLog(`wget -O "${localPath}" "${downloadUrl}"`);
 
     // 3. 停止清理
-    await stopEgg();
+    await stopService();
+    serviceStopped = true;
 
     // 4. 解压
     log('--- 4. 解压 ---');
@@ -145,14 +202,15 @@ async function run() {
 
     // 6. 启动
     log('--- 6. 启动服务 ---');
-    const startCmd = `"${nodeBin}" "${eggScripts}" start --daemon --node="${nodeBin}" --title=egg-server-server --workers=1`;
     try {
       await execLog(startCmd, { cwd: projectDir });
+      serviceStarted = true;
       log('服务启动成功');
     } catch (startErr) {
       log('首次启动失败，等待 5s 后重试...');
       await new Promise(r => setTimeout(r, 5000));
       await execLog(startCmd, { cwd: projectDir });
+      serviceStarted = true;
       log('服务启动成功（重试）');
     }
 
@@ -160,6 +218,14 @@ async function run() {
     await fs.promises.unlink(localPath).catch(e => log(`清理 zip 失败: ${e.message}`));
 
   } finally {
+    if (serviceStopped && !serviceStarted) {
+      log('升级未能完成，尝试重新启动服务');
+      try {
+        await execLog(startCmd, { cwd: projectDir });
+      } catch (restartErr) {
+        log(`恢复启动失败: ${restartErr.message}`);
+      }
+    }
     await fs.promises.unlink(lockFile).catch(() => {});
     log('锁已释放');
   }

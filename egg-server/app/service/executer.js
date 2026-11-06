@@ -20,21 +20,18 @@ const RPOP_CMD = "spop:";
 const EVAL_CMD = "reval:";
 const UPDATE_CMD = "update:";
 
-deploying = [];
+const deploying = [];
+const batches = new Map();
+const cleaner = setInterval(() => {
+  const now = Date.now();
+  deploying.filter(item => !item.using && now - item.timer > 3 * 60 * 1000).forEach(item => item.close());
+}, 1000);
+cleaner.unref();
 
 class ExecuterService extends Service {
   constructor(ctx) {
     super(ctx);
     this.env = "";
-    setInterval(() => {
-      const now = Date.now();
-      const maxTime = 3 * 60 * 1000;
-      deploying.forEach((item) => {
-        if (!item.using && now - item.timer > maxTime) {
-          item.close();
-        }
-      });
-    }, 1000);
   }
   getFile(conn, srcFile, distFile) {
     const env = this.env;
@@ -124,12 +121,12 @@ class ExecuterService extends Service {
             if (buffer) {
               broadcast.cast(`INFO:[${conn.host}] ${buffer}`, env);
             }
-            if (signal) {
+            if (signal || code !== 0) {
               broadcast.cast(
-                `ERR:[${conn.host}] ${cmd} 执行失败 code:${signal}`,
+                `ERR:[${conn.host}] ${cmd} 执行失败 code:${code} signal:${signal || ''}`,
                 env
               );
-              reject(new Error(`${cmd} 执行失败 code:${signal}`));
+              reject(new Error(`${cmd} 执行失败 code:${code}`));
             } else {
               broadcast.cast(`NORM:[${conn.host}] ${cmd} 完成`, env);
               resolve();
@@ -165,7 +162,7 @@ class ExecuterService extends Service {
             result.push(data);
           })
           .stderr.on("data", function (data) {
-            rbroadcast.cast(`ERR:[${conn.host}] ${data}`, env);
+            broadcast.cast(`ERR:[${conn.host}] ${data}`, env);
           });
       });
     });
@@ -179,6 +176,11 @@ class ExecuterService extends Service {
     const configDir = this.content.configDir;
     const tempDir = this.content.tempDir;
     const server = this.server;
+    const contained = (base, name) => {
+      if (typeof name !== 'string' || !name || /[\\/\0]/.test(name) || name === '.' || name === '..') return null;
+      const candidate = path.resolve(base, name);
+      return candidate.startsWith(`${path.resolve(base)}${path.sep}`) ? candidate : null;
+    };
     // 替换文件路径、服务器名字、配置（并更换配置里面的东西）
     const dynamics = scriptContent.match(regExp);
     if (dynamics) {
@@ -190,7 +192,8 @@ class ExecuterService extends Service {
           if (from[value]) {
             ret[item] = { err: `配置[${value}]内有循环引用` };
           } else {
-            const filePath = path.resolve(configDir, value);
+            const filePath = contained(configDir, value);
+            if (!filePath) { ret[item] = { err: `配置[${value}]名称无效` }; return ret; }
             const configContent = fs.readFileSync(filePath, "utf-8");
             if (configContent) {
               from[value] = 1;
@@ -222,8 +225,8 @@ class ExecuterService extends Service {
           }
         } else if (key === FILE_TYPE) {
           const filename = files[value];
-          const filePath = path.resolve(fileDir, filename);
-          if (fs.existsSync(filePath)) {
+          const filePath = contained(fileDir, filename);
+          if (filePath && fs.existsSync(filePath)) {
             ret[item] = { data: filePath };
           } else {
             ret[item] = { err: `文件[${filename}]找不到` };
@@ -340,13 +343,17 @@ class ExecuterService extends Service {
   }
   
   genConn(host, password, port) {
-    let item = deploying.find((item) => item.host === host);
+    let item = deploying.find((item) => item.host === host && item.env === this.env);
+    if (item?.using) throw new Error('此服务器正在部署，请等待完成或取消后重试');
     if (!item) {
       let readyResolve, readyReject;
       const waitReady = new Promise((resolve, reject) => {
         readyResolve = resolve;
         readyReject = reject;
       });
+      let cancel;
+      const cancelled = new Promise((resolve, reject) => { cancel = reject; });
+      cancelled.catch(() => {});
       const conn = new Client();
       conn.host = host;
       broadcast.cast(`NORM:[${conn.host}] 开始连接`, this.env);
@@ -360,27 +367,37 @@ class ExecuterService extends Service {
       } else {
         connCfg.password = password;
       }
-      conn
-        .connect(connCfg)
-        .on("ready", readyResolve)
-        .on("close", () => {
-          broadcast.cast(`NORM:[${item.host}] 断开连接`, this.env);
+      try {
+        conn
+          .connect(connCfg)
+          .on("ready", readyResolve)
+          .on("close", () => {
+          broadcast.cast(`NORM:[${host}] 断开连接`, this.env);
           readyReject();
-          const index = deploying.findIndex((item) => item.host === host);
+          cancel(new Error('服务器连接关闭或部署已取消'));
+          const index = item ? deploying.indexOf(item) : -1;
           if (index >= 0) {
             deploying.splice(index, 1);
           }
-        }).on("error",(e)=>{
-          broadcast.cast(`NORM:[${item.host}] 连接异常:${e.message}`, this.env);
-          readyReject();
-        });
+          }).on("error",(e)=>{
+            broadcast.cast(`ERR:[${host}] 连接异常:${e.message}`, this.env);
+            readyReject(e);
+          });
+      } catch (err) {
+        readyReject(err);
+        cancel(err);
+        throw err;
+      }
       item = {
         conn,
         host,
+        env: this.env,
         waitReady,
+        cancelled,
         close() {
-          conn.end();
-          readyReject();
+          cancel(new Error('部署已取消'));
+          conn.destroy();
+          readyReject(new Error('部署已取消'));
         },
         using: true,
         timer: Date.now(),
@@ -405,7 +422,7 @@ class ExecuterService extends Service {
     const connect = this.genConn(host, password, port);
     const conn = connect.conn;
     try {
-      await connect.waitReady;
+      await Promise.race([connect.waitReady, connect.cancelled]);
       const stack = [];
       let register;
       for (let i = 0; i < item.cmds.length; ++i) {
@@ -418,7 +435,7 @@ class ExecuterService extends Service {
             host
           );
           const paths = desc.split(",");
-          await this.putFile(conn, paths[0], paths[1]);
+          await Promise.race([this.putFile(conn, paths[0], paths[1]), connect.cancelled]);
         } else if (cmd.startsWith(GET_CMD)) {
           const desc = this.resolveStack(
             cmd.slice(GET_CMD.length).trim(),
@@ -426,21 +443,21 @@ class ExecuterService extends Service {
             host
           );
           const paths = desc.split(",");
-          await this.getFile(conn, paths[0], paths[1]);
+          await Promise.race([this.getFile(conn, paths[0], paths[1]), connect.cancelled]);
         } else if (cmd.startsWith(RUN_CMD)) {
           const desc = this.resolveStack(
             cmd.slice(RUN_CMD.length).trim(),
             stack,
             host
           );
-          await this.execute(conn, desc);
+          await Promise.race([this.execute(conn, desc), connect.cancelled]);
         } else if (cmd.startsWith(QUERY_CMD)) {
           const desc = this.resolveStack(
             cmd.slice(QUERY_CMD.length).trim(),
             stack,
             host
           );
-          register = await this.query(conn, desc);
+          register = await Promise.race([this.query(conn, desc), connect.cancelled]);
         } else if (cmd.startsWith(RPUSH_CMD)) {
           stack.push(register);
         } else if (cmd.startsWith(RPOP_CMD)) {
@@ -468,21 +485,44 @@ class ExecuterService extends Service {
   }
 
   async deployList(list) {
-    for (let i = 0; i < list.length; ++i) {
-      const item = list[i];
-      await this.deply(item);
+    const groups = new Map();
+    for (const item of list) {
+      const host = item.server.host;
+      if (!groups.has(host)) groups.set(host, []);
+      groups.get(host).push(item);
     }
+    const key = host => `${this.env}:${host}`;
+    for (const host of groups.keys()) {
+      if (batches.has(key(host)) || deploying.some(x => x.env === this.env && x.host === host && x.using)) throw new Error(`${host} 正在部署，请稍后重试`);
+    }
+    for (const host of groups.keys()) batches.set(key(host), { host, env: this.env, cancelled: false });
+    const failures = [];
+    await Promise.all([...groups].map(async ([host, items]) => {
+      const batch = batches.get(key(host));
+      try {
+        for (const item of items) {
+          if (batch.cancelled) throw new Error('部署已取消');
+          await this.deply(item);
+        }
+      } catch (err) {
+        failures.push(`${host}: ${err?.message || '连接中断'}`);
+        broadcast.cast(`ERR:[${host}] ${err?.message || '连接中断'}`, this.env);
+      } finally { batches.delete(key(host)); }
+    }));
+    if (failures.length) throw new Error(failures.join('; '));
   }
 
   run(server, cmd) {
     return this.deply({ server, cmds: [cmd] });
   }
 
-  getDeployings() {
-    return deploying.map((item) => item.host);
+  getDeployings(env) {
+    return [...new Set([...deploying.filter(item => item.env === env && item.using), ...[...batches.values()].filter(item => item.env === env)].map(item => item.host))];
   }
-  stopDeploy(host) {
-    const item = deploying.find((item) => item.host === host);
+  stopDeploy(host, env) {
+    const batch = batches.get(`${env}:${host}`);
+    if (batch) batch.cancelled = true;
+    const item = deploying.find((item) => item.host === host && item.env === env);
     if (item) {
       item.close();
     }

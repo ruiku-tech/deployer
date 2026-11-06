@@ -8,8 +8,8 @@ export function fetchBat(name) {
   return service.get(`/bat?name=${encodeURIComponent(name)}`);
 }
 /**新增编排组合 */
-export function saveBat(name, data) {
-  return service.post("/bat", { name, data });
+export function saveBat(name, data, note) {
+  return service.post("/bat", { name, data, note });
 }
 /**删除编排组合 */
 export function deleteBat(name) {

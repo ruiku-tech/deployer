@@ -4,7 +4,7 @@
       <h1 class="title">部署平台管理系统</h1>
       <el-card class="box-card">
         <el-tabs v-model="loginModel" @tab-click="handleClick">
-          <el-tab-pane label="登陆" name="0">登陆</el-tab-pane>
+          <el-tab-pane label="登录" name="0">登录</el-tab-pane>
           <el-tab-pane label="注册" name="1">注册</el-tab-pane>
         </el-tabs>
         <el-form ref="registerForm" :model="registerForm" label-width="60px">
@@ -17,11 +17,11 @@
               v-model="registerForm.password"
             ></el-input>
           </el-form-item>
-          <el-form-item v-if="loginModel == '1'" label="code:" prop="code">
+          <el-form-item v-if="loginModel == '1'" label="验证码:" prop="code">
             <el-input type="password" v-model="registerForm.code"></el-input>
           </el-form-item>
           <el-button style="width: 100%" type="primary" @click="submit">{{
-            loginModel == "0" ? "登陆" : "注册"
+            loginModel == "0" ? "登录" : "注册"
           }}</el-button>
         </el-form>
       </el-card>
@@ -55,8 +55,9 @@ export default {
       if (this.loginModel == "0") {
         login(this.registerForm.username, this.registerForm.password).then(
           (data) => {
-            localStorage.setItem("token", data.token);
-            dataCenter.token.value = data.token;
+            dataCenter.setToken(data.token);
+            dataCenter.user.value = data.username;
+            dataCenter.role.value = data.role || 'member';
           }
         );
       } else {
