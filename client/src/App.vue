@@ -1,7 +1,7 @@
 <template>
   <Login v-if="!dataCenter.token"></Login>
   <div class="main" v-if="dataCenter.token">
-    <header class="topbar"><strong>部署管理平台</strong><div class="top-actions"><span v-if="disk">磁盘已用 {{ formatSize(disk.total - disk.free) }} / {{ formatSize(disk.total) }}（可用 {{ formatSize(disk.free) }}）</span><EnvSwitch /><el-button text @click="logout">退出</el-button></div></header>
+    <header class="topbar"><strong>部署管理平台</strong><div class="top-actions"><span v-if="disk">磁盘已用 {{ formatSize(disk.total - disk.free) }} / {{ formatSize(disk.total) }}（可用 {{ formatSize(disk.free) }}）</span><EnvSwitch /><el-button v-if="canManageVersions" text title="版本管理（Ctrl + U，Mac 也支持 Command + U）" @click="updateDialogVisible = true">版本管理</el-button><el-button text @click="logout">退出</el-button></div></header>
     <Operator />
     <el-button class="log-button" type="primary" @click="logVisible = true">部署日志</el-button>
     <div v-show="logVisible" class="log-panel" :class="{ fullscreen: logFullscreen }">
@@ -9,6 +9,7 @@
       <Logger />
     </div>
     <Confirm />
+    <UpdateDialog v-if="canManageVersions" v-model="updateDialogVisible" />
   </div>
 </template>
 
@@ -18,6 +19,7 @@ import Operator from "./components/Operator.vue";
 import service from "./api/base";
 import EnvSwitch from "./components/EnvSwitch.vue";
 import Confirm from "./components/Confirm.vue";
+import UpdateDialog from "./components/UpdateDialog.vue";
 
 import Login from "./components/Login.vue";
 import dataCenter from "./dataCenter";
@@ -33,6 +35,7 @@ export default {
       logFullscreen: false,
       diskTimer: null,
       identityRevision: 0,
+      updateDialogVisible: false,
     };
   },
   components: {
@@ -41,14 +44,17 @@ export default {
     EnvSwitch,
     Confirm,
     Login,
+    UpdateDialog,
   },
   mounted() {
+    window.addEventListener('keydown', this.onVersionShortcut);
     const token = localStorage.getItem("token");
     if (token) {
       dataCenter.setToken(token);
     }
   },
   watch: {
+    canManageVersions(value) { if (!value) this.updateDialogVisible = false; },
     authenticated: { immediate: true, handler(token) {
       clearInterval(this.diskTimer);
       this.identityRevision++;
@@ -62,9 +68,21 @@ export default {
       }
     } },
   },
-  computed: { authenticated() { return !!dataCenter.token.value; } },
-  beforeUnmount() { clearInterval(this.diskTimer); },
+  computed: {
+    authenticated() { return !!dataCenter.token.value; },
+    canManageVersions() { return this.authenticated && ['superadmin', 'admin'].includes(dataCenter.role.value); },
+  },
+  beforeUnmount() {
+    clearInterval(this.diskTimer);
+    window.removeEventListener('keydown', this.onVersionShortcut);
+  },
   methods: {
+    onVersionShortcut(event) {
+      if (!this.canManageVersions || event.defaultPrevented || event.isComposing || event.repeat || event.altKey || event.shiftKey || !(event.ctrlKey || event.metaKey) || event.code !== 'KeyU') return;
+      if (event.target?.closest?.('input, textarea, select, [contenteditable], .xterm')) return;
+      event.preventDefault();
+      this.updateDialogVisible = true;
+    },
     loadIdentity() {
       const revision = this.identityRevision;
       return service.get('/me', { headers: { nofeel: true } }).then(user => {
