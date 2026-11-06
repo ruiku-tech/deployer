@@ -11,12 +11,13 @@ export function fetchFilesStat() {
 export function uploadFile(file, memo) {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("memo", memo);
   const encodedRemark = btoa(unescape(encodeURIComponent(memo)));
   return service.post("/file", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
       withProgress: 1,
+      'X-File-Size': file.size,
+      'X-Upload-Id': `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       "memo":encodedRemark
     },
     timeout: 20 * 60 * 1000,

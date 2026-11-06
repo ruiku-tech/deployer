@@ -1,9 +1,9 @@
 <template>
   <div class="content">
     <div class="panel" style="display: flex; flex-direction: row; align-items: center">
-      <input ref="file" type="file" placeholder="请选择文件" />
-      <el-input v-model="inputs" style="flex: 1;border-radius: 18px;margin-left: 10px" placeholder="关于本次更新包的介绍" />
-      <el-button type="primary" round @click="upload">上传</el-button>
+      <input ref="file" type="file" :disabled="uploading" placeholder="请选择文件" />
+      <el-input v-model="inputs" :disabled="uploading" style="flex: 1;border-radius: 18px;margin-left: 10px" placeholder="关于本次更新包的介绍" />
+      <el-button type="primary" round :loading="uploading" :disabled="uploading" @click="upload">{{ uploading ? '上传中' : '上传' }}</el-button>
     </div>
     <el-card class="box-card">
       <template #header>
@@ -156,6 +156,7 @@ export default {
       list: [],
       selected: [],
       filterKey: "",
+      uploading: false,
     };
   },
   computed:{
@@ -177,12 +178,15 @@ export default {
       );
     },
     upload() {
+      if (this.uploading) return;
       const file = this.$refs.file;
       if (file.files[0]) {
+        this.uploading = true;
         uploadFile(file.files[0], this.inputs).then(() => {
           this.inputs = '';
-          setTimeout(this.fresh, 1000);
-        });
+          file.value = '';
+          setTimeout(this.fresh, 300);
+        }).catch(() => { /* API interceptor displays errors. */ }).finally(() => { this.uploading = false; });
       } else {
         ElMessage.error("请先选择文件");
       }

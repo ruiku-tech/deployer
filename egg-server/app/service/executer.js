@@ -28,6 +28,28 @@ const cleaner = setInterval(() => {
 }, 1000);
 cleaner.unref();
 
+function withSftp(conn, operation) {
+  return new Promise((resolve, reject) => {
+    conn.sftp((err, sftp) => {
+      if (err) return reject(err);
+      let finished = false;
+      const finish = (failure) => {
+        if (finished) return;
+        finished = true;
+        try { sftp.end(); } catch (closeError) {
+          if (!failure) failure = closeError;
+        }
+        if (failure) reject(failure);
+        else resolve();
+      };
+      sftp.once('error', finish);
+      sftp.once('close', () => finish(new Error('SFTP通道已关闭，文件传输未完成')));
+      try { operation(sftp, finish); }
+      catch (failure) { finish(failure); }
+    });
+  });
+}
+
 class ExecuterService extends Service {
   constructor(ctx) {
     super(ctx);
@@ -35,9 +57,7 @@ class ExecuterService extends Service {
   }
   getFile(conn, srcFile, distFile) {
     const env = this.env;
-    return new Promise((resolve, reject) => {
-      conn.sftp(function (err, sftp) {
-        if (err) return reject(err);
+    return withSftp(conn, (sftp, finish) => {
         let now = Date.now();
         // 下载文件
         sftp.fastGet(
@@ -60,31 +80,26 @@ class ExecuterService extends Service {
           function (err) {
             if (err) {
               broadcast.cast(`ERR:[${conn.host}] ${err.message}`, env);
-              return reject(err);
+              return finish(err);
             }
             broadcast.cast(`INFO:[${conn.host}] 文件下载成功`, env);
-            resolve();
+            finish();
           }
         );
-      });
     });
   }
   putFile(conn, srcFile, distFile) {
     const env = this.env;
-    return new Promise((resolve, reject) => {
-      conn.sftp(function (err, sftp) {
-        if (err) return reject(err);
+    return withSftp(conn, (sftp, finish) => {
         let now = Date.now();
         // 上传文件
-        try {
-          sftp.fastPut(
+        sftp.fastPut(
             srcFile,
             distFile,
             {
               step(transferred, chunk, total) {
                 if (Date.now() - now > 1000 || transferred >= total) {
                   now = Date.now();
-                  console.log(conn.host, "12", "不对行");
                   broadcast.cast(
                     `INFO:[${conn.host}] 进度:${(
                       (transferred * 100) /
@@ -98,16 +113,12 @@ class ExecuterService extends Service {
             function (err) {
               if (err) {
                 broadcast.cast(`ERR:[${conn.host}] ${err.message}`, env);
-                return reject(err);
+                return finish(err);
               }
               broadcast.cast(`INFO:[${conn.host}] 文件上传成功`, env);
-              resolve();
+              finish();
             }
           );
-        } catch (error) {
-          console.log(error);
-        }
-      });
     });
   }
   execute(conn, cmd) {
@@ -361,6 +372,8 @@ class ExecuterService extends Service {
         host,
         port,
         username: "root",
+        keepaliveInterval: 15000,
+        keepaliveCountMax: 3,
       };
       if (password.length > 32) {
         connCfg.privateKey = password;
@@ -382,6 +395,9 @@ class ExecuterService extends Service {
           }).on("error",(e)=>{
             broadcast.cast(`ERR:[${host}] 连接异常:${e.message}`, this.env);
             readyReject(e);
+            cancel(e);
+            const index = item ? deploying.indexOf(item) : -1;
+            if (index >= 0) deploying.splice(index, 1);
           });
       } catch (err) {
         readyReject(err);
@@ -395,6 +411,8 @@ class ExecuterService extends Service {
         waitReady,
         cancelled,
         close() {
+          const index = deploying.indexOf(this);
+          if (index >= 0) deploying.splice(index, 1);
           cancel(new Error('部署已取消'));
           conn.destroy();
           readyReject(new Error('部署已取消'));
@@ -479,6 +497,11 @@ class ExecuterService extends Service {
         }
         connect.record();
       }
+    } catch (err) {
+      // A failed channel must not poison subsequent deployments for the entire
+      // cache lifetime. Never retry commands here: they may have side effects.
+      connect.close();
+      throw err;
     } finally {
       connect.using = false;
     }

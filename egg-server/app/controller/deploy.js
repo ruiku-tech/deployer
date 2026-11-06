@@ -1,7 +1,6 @@
 const { Controller } = require("egg");
 const dayjs = require("dayjs");
 const utils = require("../service/utils");
-const multer = require("multer");
 const { log, error } = require("console");
 const { isObjectEqual } = require("../service/record");
 const fs = require("fs");
@@ -12,20 +11,8 @@ const database = require("../service/database");
 const access = require('./../service/access');
 const disk = require("../service/disk");
 const speakeasy = require("speakeasy");
+const { randomUUID } = require('crypto');
 const userFile = config.userFile();
-const storage = multer.diskStorage({
-  destination(req, file, cb) {
-    cb(null, req.context.fileDir); // 上传文件的存储路径
-  },
-  filename(req, file, cb) {
-    const now = dayjs();
-    const time = now.format("YYYYMMDD-HH:mm:ss");
-    cb(null, `${time}~${file.originalname}`); // 上传文件的文件名
-  },
-});
-const upload = multer({
-  storage,
-});
 const util = require("util");
 
 const readFile = util.promisify(fs.readFile);
@@ -137,9 +124,21 @@ class DeployController extends Controller {
 
   // 文件上传
   async uploadFile(ctx) {
+    const requestId = randomUUID();
+    const clientUploadId = ctx.request.headers['x-upload-id'];
+    const uploadId = typeof clientUploadId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(clientUploadId) ? clientUploadId : requestId;
+    const trace = (event, details = {}) => ctx.logger?.info('[Upload] %j', {
+      event, requestId, uploadId, username: ctx.state?.user?.username,
+      env: ctx.request.headers.env, ip: ctx.ip, ...details,
+    });
+    const sizeHeader = ctx.request.headers['x-file-size'];
+    const expectedSize = sizeHeader === undefined ? null : Number(sizeHeader);
+    ctx.assert(expectedSize === null || (sizeHeader !== '' && Number.isSafeInteger(expectedSize) && expectedSize >= 0), 400, '上传文件大小无效');
+    trace('received', { expectedSize });
     try {
-      await disk.requireSpace(workspaceDir, Number(ctx.request.length) || 0);
+      await disk.requireSpace(workspaceDir, expectedSize ?? (Number(ctx.request.length) || 0));
     } catch (err) {
+      trace('rejected', { error: err.message });
       ctx.status = err.code === 'ENOSPC' ? 507 : 500;
       ctx.body = { message: err.message };
       return;
@@ -149,47 +148,62 @@ class DeployController extends Controller {
     const memos = req.headers.memo;
     const memo = memos ? decodeURIComponent(escape(atob(memos))) : "";
 
-    const time = dayjs().format("YYYYMMDD-HH:mm:ss");
-    const baseName = `${time}~${path.basename(stream.filename)}`;
-    const fileName = memo ? `${baseName}` : baseName;
-    // const fileName = memo ? `${baseName}||${memo}` : baseName;
-    // 生成目标文件路径
-    const targetPath = path.resolve(req.context.fileDir, fileName);
+    const time = dayjs().format("YYYYMMDD-HH:mm:ss.SSS");
+    const originalName = path.basename(stream.filename);
     // 确保目标目录存在
     await fs.promises.mkdir(req.context.fileDir, { recursive: true });
-    // 创建写流
-    const writeStream = fs.createWriteStream(targetPath);
+    let fileName;
+    let targetPath;
+    let fileHandle;
+    let suffix = 0;
+    while (!fileHandle) {
+      fileName = `${time}${suffix ? `-${suffix}` : ''}~${originalName}`;
+      targetPath = path.resolve(req.context.fileDir, fileName);
+      try { fileHandle = await fs.promises.open(targetPath, 'wx'); }
+      catch (err) {
+        if (err.code !== 'EEXIST') throw err;
+        suffix++;
+      }
+    }
+    // Write directly to the timestamped package so its size remains visible
+    // while uploading; remove it if the request is interrupted or incomplete.
+    const writeStream = fileHandle.createWriteStream();
+    trace('writing', { fileName });
+    const abort = () => stream.destroy(new Error('上传已中断，请重新上传'));
+    ctx.req?.once('aborted', abort);
+    let receivedSize;
     // 使用 pump 将文件流传输到写流
     try {
+      if (ctx.req?.aborted) abort();
       await pump(stream, disk.uploadGuard(workspaceDir), writeStream);
+      receivedSize = (await fs.promises.stat(targetPath)).size;
+      if (stream.truncated || ctx.req?.aborted || (expectedSize !== null && receivedSize !== expectedSize)) {
+        const err = new Error('上传文件不完整，请重新上传');
+        err.status = 400;
+        throw err;
+      }
     } catch (err) {
+      const receivedSize = await fs.promises.stat(targetPath).then(stat => stat.size, () => null);
+      trace('failed', { fileName, receivedSize, expectedSize, error: err.message });
       await fs.promises.unlink(targetPath).catch(() => {});
-      ctx.status = err.code === 'ENOSPC' ? 507 : 500;
+      ctx.status = err.code === 'ENOSPC' ? 507 : err.status || 500;
       ctx.body = { message: err.code === 'ENOSPC' ? '服务器磁盘空间不足，请清理文件后重试' : err.message };
       return;
+    } finally {
+      ctx.req?.removeListener('aborted', abort);
     }
     try {
       database.createFileMemo({ fileName, memo });
     } catch (err) {
+      trace('failed', { fileName, receivedSize, expectedSize, error: err.message });
+      await fs.promises.unlink(targetPath).catch(() => {});
       console.error("Error saving file memo:", err);
-      ctx.throw(500, "Error saving file memo");
+      ctx.status = 500;
+      ctx.body = { message: '保存上传文件失败，请重新上传' };
+      return;
     }
 
-    // 删除老的三个文件
-    // const files = await fs.promises.readdir(req.context.fileDir);
-    // console.log('删除老的三个文件' + files);
-    // const sortedFiles = files.map(file => {
-    //   const filePath = path.resolve(req.context.fileDir, file);
-    //   return {
-    //     file,
-    //     time: fs.statSync(filePath).mtime.getTime(),
-    //   };
-    // }).sort((a, b) => b.time - a.time);
-    // const filesToDelete = sortedFiles.slice(3).map(f => f.file);
-    // for (const file of filesToDelete) {
-    //   await fs.promises.unlink(path.resolve(req.context.fileDir, file));
-    //   fileMemo.deleteOne({ fileName: file });
-    // }
+    trace('completed', { fileName, receivedSize });
     ctx.body = { data: "success" };
   }
 
