@@ -1,5 +1,9 @@
 class AppBootHook {
-  constructor(app) { this.app = app; }
+  constructor(app) {
+    this.app = app;
+    // 必须在 static 前执行，否则静态文件直接返回后应用中间件不会生效。
+    app.config.coreMiddleware.unshift('indexCache');
+  }
   async willReady() {
     // 进程退出时的执行结果无法判定，标记中断，防止重启重复发布。
     require('./app/service/releases').initSchedules()

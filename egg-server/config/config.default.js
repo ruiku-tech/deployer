@@ -45,8 +45,8 @@ module.exports = (appInfo) => {
     dir: path.join(appInfo.baseDir, "app/public/dist"), // 静态文件存放的目录
     dynamic: true, // 是否支持动态加载
     preload: false, // 是否预加载静态资源
-    maxAge: 31536000, // 浏览器缓存时间，单位为毫秒，默认为一年
-    buffer: true, // 是否启用文件缓存
+    maxAge: 31536000, // 浏览器缓存一年（秒），indexCache 中间件单独处理入口 HTML。
+    buffer: false, // 每次检查文件，避免服务运行期间重新 build 后仍返回旧内容。
   };
 
   config.multipart = {
