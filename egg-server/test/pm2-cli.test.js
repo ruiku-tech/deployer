@@ -6,8 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const packageJson = require('../package.json');
-const findPm2Cli = require('../app/service/pm2Cli');
-const pm2Environment = require('../app/service/pm2Environment');
+const { findPm2Cli } = require('../app/service/pm2Cli');
+const { pm2Environment } = require('../app/service/pm2Environment');
 
 test('PM2 resolution skips project binaries and selects a global symlink', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deployer-pm2-'));

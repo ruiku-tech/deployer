@@ -15,7 +15,7 @@ const execFileAsync = promisify(execFile);
 const sourceDir = path.resolve(__dirname, '..');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deployer-update-check-'));
 const fixtureDir = path.join(root, 'app');
-const pm2Cli = require('../app/service/pm2Cli')();
+const pm2Cli = require('../app/service/pm2Cli').findPm2Cli();
 const env = { ...process.env, PM2_HOME: path.join(root, 'pm2'), PM2_SILENT: 'true' };
 // Do not inherit the caller's PM2 app identity if this check runs under PM2.
 for (const key of ['pm_id', 'NODE_APP_INSTANCE', 'name', 'NODE_OPTIONS']) delete env[key];

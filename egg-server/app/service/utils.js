@@ -1,8 +1,8 @@
 const fs = require("fs");
 const { spawn, spawnSync } = require("child_process");
 const path = require("path");
-const pm2Environment = require("./pm2Environment");
-const findPm2Cli = require("./pm2Cli");
+const { pm2Environment } = require("./pm2Environment");
+const { findPm2Cli } = require("./pm2Cli");
 
 const varSpliter = ">>";
 

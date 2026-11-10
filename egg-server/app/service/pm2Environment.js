@@ -26,9 +26,11 @@ const runtimeFields = [
   'NODE_APP_INSTANCE', 'NODE_UNIQUE_ID', 'PM2_USAGE', 'PM2_JSON_PROCESSING',
 ];
 
-module.exports = function pm2Environment(source = process.env) {
+function pm2Environment(source = process.env) {
   const env = { ...source };
   for (const key of [ ...configFields, ...runtimeFields ]) delete env[key];
   // Preserve PM2_HOME so all commands use the same daemon.
   return env;
-};
+}
+
+module.exports = { pm2Environment };

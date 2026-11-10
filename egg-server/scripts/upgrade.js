@@ -3,8 +3,8 @@ const path = require('path');
 const { exec } = require('child_process');
 const axios = require('axios').default;
 const { promisify } = require('util');
-const pm2Environment = require('../app/service/pm2Environment');
-const findPm2Cli = require('../app/service/pm2Cli');
+const { pm2Environment } = require('../app/service/pm2Environment');
+const { findPm2Cli } = require('../app/service/pm2Cli');
 
 /**
  * 自动升级脚本

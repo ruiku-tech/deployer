@@ -1,8 +1,8 @@
 'use strict';
 
 const { spawn } = require('child_process');
-const pm2Environment = require('../app/service/pm2Environment');
-const findPm2Cli = require('../app/service/pm2Cli');
+const { pm2Environment } = require('../app/service/pm2Environment');
+const { findPm2Cli } = require('../app/service/pm2Cli');
 
 try {
   const cli = findPm2Cli();

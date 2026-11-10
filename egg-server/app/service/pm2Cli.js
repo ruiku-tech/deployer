@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-module.exports = function findPm2Cli(source = process.env) {
+function findPm2Cli(source = process.env) {
   const explicit = source.DEPLOY_PM2_BIN;
   if (explicit) {
     if (!path.isAbsolute(explicit) || explicit.includes(`${path.sep}node_modules${path.sep}`)) {
@@ -24,4 +24,7 @@ module.exports = function findPm2Cli(source = process.env) {
     }
   }
   throw new Error('未找到全局 PM2，请确认已全局安装 PM2 且 pm2 命令位于服务 PATH 中');
-};
+}
+
+// Egg invokes bare function exports in app/service as service factories.
+module.exports = { findPm2Cli };
