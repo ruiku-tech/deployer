@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "1.0.0",
+  "version": "1.2.3",
   "description": "",
   "private": true,
   "egg": {
@@ -21,7 +21,7 @@
     "express": "^4.18.2",
     "mongoose": "^8.5.2",
     "multer": "^1.4.5-lts.1",
-    "pm2": "^5.3.1",
+    "mz-modules": "^2.1.0",
     "querystring": "^0.2.1",
     "speakeasy": "^2.0.0",
     "ssh2": "^1.15.0",
@@ -39,8 +39,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "pm2 startOrRestart ecosystem.config.js --only deployer",
-    "stop": "pm2 delete deployer || true",
+    "start": "node scripts/pm2.js startOrRestart ecosystem.config.js --only deployer",
+    "stop": "node scripts/pm2.js delete deployer",
     "dev": "egg-bin dev --port 3000",
     "test": "npm run lint -- --fix && npm run test:local",
     "test:local": "egg-bin test",

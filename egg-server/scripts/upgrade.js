@@ -4,6 +4,7 @@ const { exec } = require('child_process');
 const axios = require('axios').default;
 const { promisify } = require('util');
 const pm2Environment = require('../app/service/pm2Environment');
+const findPm2Cli = require('../app/service/pm2Cli');
 
 /**
  * 自动升级脚本
@@ -25,7 +26,7 @@ delete commandEnv.UPGRADE_VERSION;
 
 const nodeBin = process.execPath;
 const npmBin = path.join(path.dirname(nodeBin), 'npm');
-const pm2Bin = path.join(projectDir, 'node_modules', '.bin', 'pm2');
+const pm2Bin = findPm2Cli();
 const pm2Config = path.join(projectDir, 'ecosystem.config.js');
 const pm2AppName = 'deployer';
 
@@ -194,11 +195,7 @@ async function run() {
 
     // 5. 安装依赖
     log('--- 5. 安装依赖 ---');
-    try {
-      await execLog(`"${npmBin}" install --production`, { cwd: projectDir });
-    } catch (e) {
-      log('依赖安装失败，继续尝试启动');
-    }
+    await execLog(`"${npmBin}" install --omit=dev`, { cwd: projectDir });
 
     // 6. 启动
     log('--- 6. 启动服务 ---');

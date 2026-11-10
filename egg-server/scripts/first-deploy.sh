@@ -12,6 +12,7 @@ yum install -y unzip
 curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
 #curl -sL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo yum install -y nodejs
+npm install -g pm2@5 || exit 1
 #sudo yum install -y npm
 
 LATEST_RELEASE_INFO=$(curl -s "https://api.github.com/repos/ruiku-tech/deployer/releases/latest")

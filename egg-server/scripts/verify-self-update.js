@@ -15,7 +15,7 @@ const execFileAsync = promisify(execFile);
 const sourceDir = path.resolve(__dirname, '..');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deployer-update-check-'));
 const fixtureDir = path.join(root, 'app');
-const pm2Cli = path.join(sourceDir, 'node_modules/pm2/bin/pm2');
+const pm2Cli = require('../app/service/pm2Cli')();
 const env = { ...process.env, PM2_HOME: path.join(root, 'pm2'), PM2_SILENT: 'true' };
 // Do not inherit the caller's PM2 app identity if this check runs under PM2.
 for (const key of ['pm_id', 'NODE_APP_INSTANCE', 'name', 'NODE_OPTIONS']) delete env[key];
@@ -87,6 +87,7 @@ async function setup() {
   }
   fs.copyFileSync(path.join(sourceDir, 'app/service/pm2Config.js'), path.join(fixtureDir, 'app/service/pm2Config.js'));
   fs.copyFileSync(path.join(sourceDir, 'app/service/pm2Environment.js'), path.join(fixtureDir, 'app/service/pm2Environment.js'));
+  fs.copyFileSync(path.join(sourceDir, 'app/service/pm2Cli.js'), path.join(fixtureDir, 'app/service/pm2Cli.js'));
   fs.writeFileSync(path.join(fixtureDir, 'version.json'), JSON.stringify({ version: 'v1' }));
   fs.writeFileSync(path.join(fixtureDir, 'ecosystem.config.js'), `
     const config = require('./app/service/pm2Config');
@@ -160,7 +161,7 @@ async function setup() {
         }, 1800);
         return;
       }
-      if (cmd.endsWith(' install --production')) {
+      if (cmd.endsWith(' install --omit=dev')) {
         record('dependencies-installed');
         queueMicrotask(() => callback(null, 'dependency installation simulated', ''));
         return;
@@ -190,7 +191,10 @@ async function checkUpgrade(version) {
   assert.match(duplicate.body.error, /正在/);
 
   await until(async () => !(await health()), 'old A stops');
-  const running = await processes();
+  const running = await until(async () => {
+    const list = await processes();
+    return !list.some(app => app.name === 'deployer') && list;
+  }, 'PM2 finishes removing old A');
   const updater = running.find(app => app.name === 'deployer-updater');
   assert.equal(updater?.pm2_env.status, 'online', 'Updater must survive after A stops');
   process.kill(updater.pid, 0);

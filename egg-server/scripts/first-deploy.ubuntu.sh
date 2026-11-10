@@ -8,6 +8,7 @@ systemctl enable --now docker
 
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt install -y nodejs
+npm install -g pm2@5 || exit 1
 
 
 

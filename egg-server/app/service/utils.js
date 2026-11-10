@@ -2,6 +2,7 @@ const fs = require("fs");
 const { spawn, spawnSync } = require("child_process");
 const path = require("path");
 const pm2Environment = require("./pm2Environment");
+const findPm2Cli = require("./pm2Cli");
 
 const varSpliter = ">>";
 
@@ -37,7 +38,7 @@ function selfUpdate(version) {
 
   // 由 PM2 单独托管更新进程，宿主服务退出后更新仍可继续执行。
   const projectDir = path.resolve(__dirname, "..", "..");
-  const pm2Bin = path.join(projectDir, "node_modules", ".bin", "pm2");
+  const pm2Bin = findPm2Cli();
   const pm2Config = path.join(projectDir, "ecosystem.config.js");
   const submitLock = "/tmp/deployer-updater-submit.lock";
   const env = Object.assign(pm2Environment(), { UPGRADE_VERSION: version || "" });
