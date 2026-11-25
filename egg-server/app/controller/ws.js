@@ -3,6 +3,7 @@ const Controller = require("egg").Controller;
 const broadcast = require("../service/broadcast");
 const { v4: uuidv4 } = require("uuid");
 const access = require('../service/access');
+const devices = require('../service/deviceSecurity');
 
 class WSController extends Controller {
   async connect() {
@@ -11,7 +12,9 @@ class WSController extends Controller {
     try {
       const token = ctx.query.token;
       const decoded = app.jwt.verify(token, app.config.jwt.secret);
-      if (!access.user(decoded.username) || access.user(decoded.username).disabled) throw new Error('用户不可用');
+      const user = access.user(decoded.username);
+      if (!user || user.disabled || !ctx.query.deviceId ||
+          devices.deviceHash(ctx.query.deviceId) !== decoded.deviceId || !devices.isTrusted(user.id, ctx.query.deviceId)) throw new Error('用户或设备不可用');
       broadcast.init(websocket, decoded.username);
     } catch (err) { websocket.close(); }
   }
@@ -22,6 +25,9 @@ class WSController extends Controller {
     let decoded;
     try {
       decoded = ctx.app.jwt.verify(ctx.query.token, ctx.app.config.jwt.secret);
+      const user = access.user(decoded.username);
+      if (!user || user.disabled || !ctx.query.deviceId ||
+          devices.deviceHash(ctx.query.deviceId) !== decoded.deviceId || !devices.isTrusted(user.id, ctx.query.deviceId)) throw new Error('设备未获信任');
     } catch (err) { websocket.close(4401, '登录已过期，请重新登录后连接'); return; }
     if (!access.canAccess(decoded.username, ctx.params.env)) {
       websocket.close(4403, '无权访问此环境或账号已被停用');

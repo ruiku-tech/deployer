@@ -16,6 +16,7 @@ const database = require('../app/service/database');
 const access = require('../app/service/access');
 const TeamController = require('../app/controller/team');
 const auth = require('../app/middleware/auth')();
+const devices = require('../app/service/deviceSecurity');
 let users, secondTeam;
 
 function controller(username, body, method = 'setRole') {
@@ -31,6 +32,9 @@ function controller(username, body, method = 'setRole') {
 test.before(() => {
   for (const name of ['root', 'alice', 'bob', 'disabled']) access.register(name, 'password');
   users = Object.fromEntries(['root', 'alice', 'bob', 'disabled'].map(name => [name, access.user(name)]));
+  for (const username of ['root', 'alice', 'bob', 'disabled']) {
+    devices.trustInitialDevice(access.user(username).id, `00000000-0000-4000-8000-00000000000${['root', 'alice', 'bob', 'disabled'].indexOf(username) + 1}`);
+  }
   const db = access.init();
   secondTeam = Number(db.prepare("INSERT INTO teams(name) VALUES ('第二分组')").run().lastInsertRowid);
   db.prepare('INSERT INTO team_members(team_id,user_id) VALUES (?,?)').run(1, users.alice.id);
@@ -97,11 +101,13 @@ test('invalid grants are rejected without changing roles', async () => {
 
 test('revocation applies to existing tokens immediately and preserves original group membership', async () => {
   const secret = 'admin-role-test-secret';
-  const token = jwt.sign({ username: 'alice' }, secret, { expiresIn: 7200 });
+  const deviceId = '00000000-0000-4000-8000-000000000002';
+  const token = jwt.sign({ username: 'alice', deviceId: devices.deviceHash(deviceId) }, secret, { expiresIn: 7200 });
   async function authenticated() {
     const ctx = {
       ...controller('alice', {}).ctx,
-      header: { authorization: token },
+      header: { authorization: token, 'x-device-id': deviceId },
+      get(name) { return name.toLowerCase() === 'x-device-id' ? deviceId : ''; },
       app: { jwt, config: { jwt: { secret, renewBeforeSeconds: 1800 } } },
     };
     let called = false;

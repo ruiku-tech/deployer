@@ -37,6 +37,7 @@ export default {
       const url = new URL(base, window.location.origin);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       url.searchParams.set('token', dataCenter.token.value);
+      url.searchParams.set('deviceId', dataCenter.deviceId);
       const ws = this.ws = new WebSocket(url.toString());
       ws.onmessage = event => {
         const match = /^环境:([^:]+):(\w+):\[([^\]]+)\]\s?([\s\S]*)$/.exec(event.data);

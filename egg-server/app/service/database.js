@@ -38,6 +38,36 @@ function initTables() {
     )
   `);
 
+  // 持久化登录失败和锁定状态，重启及版本更新不会清空限制。
+  d.exec(`CREATE TABLE IF NOT EXISTS login_attempts (
+    username TEXT PRIMARY KEY,
+    failed_at TEXT NOT NULL DEFAULT '[]',
+    locked_until INTEGER NOT NULL DEFAULT 0,
+    expires_at INTEGER NOT NULL
+  )`);
+  d.exec('CREATE INDEX IF NOT EXISTS idx_login_attempts_expires ON login_attempts(expires_at)');
+  d.exec(`CREATE TABLE IF NOT EXISTS trusted_devices (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    device_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    PRIMARY KEY(user_id, device_hash)
+  );
+  CREATE TABLE IF NOT EXISTS device_approvals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    device_hash TEXT NOT NULL,
+    challenge_hash TEXT NOT NULL UNIQUE,
+    user_agent TEXT NOT NULL DEFAULT '',
+    ip TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_device_approval_pending
+    ON device_approvals(user_id, device_hash) WHERE status='pending';
+  CREATE INDEX IF NOT EXISTS idx_device_approval_status ON device_approvals(status, expires_at);`);
+
   // 部署记录表
   d.exec(`
     CREATE TABLE IF NOT EXISTS records (

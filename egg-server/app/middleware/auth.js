@@ -13,12 +13,17 @@ module.exports = () => {
       const decoded = ctx.app.jwt.verify(token, ctx.app.config.jwt.secret);
       const user = require('../service/access').user(decoded.username);
       if (!user || user.disabled) throw new Error('用户不可用');
+      const deviceId = ctx.get('X-Device-ID');
+      const deviceSecurity = require('../service/deviceSecurity');
+      if (!deviceId || !decoded.deviceId ||
+          deviceSecurity.deviceHash(deviceId) !== decoded.deviceId ||
+          !deviceSecurity.isTrusted(user.id, deviceId)) throw new Error('设备未获信任');
       ctx.state.user = user;
       // Renew before expiry while the browser is using the platform. Always
       // verify the original signature/expiry and current user before renewing.
       const remaining = decoded.exp - Math.floor(Date.now() / 1000);
       if (remaining <= ctx.app.config.jwt.renewBeforeSeconds) {
-        ctx.set('X-Access-Token', require('../service/session').issueToken(ctx.app, user.username));
+        ctx.set('X-Access-Token', require('../service/session').issueToken(ctx.app, user.username, decoded.deviceId, true));
         ctx.set('Cache-Control', 'no-store');
       }
     } catch (err) {

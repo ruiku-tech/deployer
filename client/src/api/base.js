@@ -20,6 +20,7 @@ service.interceptors.request.use(
     } else {
       delete config.headers.Authorization;
     }
+    config.headers["X-Device-ID"] = dataCenter.deviceId;
     return config;
   },
   (error) => {

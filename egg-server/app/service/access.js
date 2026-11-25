@@ -42,6 +42,7 @@ function init() {
 }
 function validEnv(name) { return typeof name === 'string' && /^[a-zA-Z0-9_-]+$/.test(name) && !['user', 'temp'].includes(name); }
 function user(username) { return init().prepare('SELECT id,username,role,disabled FROM users WHERE username=?').get(username); }
+function userById(id) { return init().prepare('SELECT id,username,role,disabled FROM users WHERE id=?').get(id); }
 function isAdmin(current) { return !!current && !current.disabled && ['superadmin', 'admin'].includes(current.role); }
 function canAccess(username, env) {
   const current = user(username);
@@ -76,4 +77,4 @@ function register(username, password) {
   }
   return result;
 }
-module.exports = { init, user, isAdmin, validEnv, canAccess, assertEnv, assertAdmin, assertSuperAdmin, assertTeam, teams, register, workspace };
+module.exports = { init, user, userById, isAdmin, validEnv, canAccess, assertEnv, assertAdmin, assertSuperAdmin, assertTeam, teams, register, workspace };

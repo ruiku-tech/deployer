@@ -14,8 +14,9 @@ function signingSecret() {
   return secret;
 }
 
-function issueToken(app, username) {
-  return app.jwt.sign({ username }, app.config.jwt.secret, {
+function issueToken(app, username, deviceId, hashedDeviceId = false) {
+  const idHash = hashedDeviceId ? deviceId : require('./deviceSecurity').deviceHash(deviceId);
+  return app.jwt.sign({ username, deviceId: idHash }, app.config.jwt.secret, {
     expiresIn: app.config.jwt.expiresIn,
   });
 }

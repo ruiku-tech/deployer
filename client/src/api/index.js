@@ -12,3 +12,4 @@ export * from "./recordList";
 export * from "./teams";
 export * from "./remote";
 export * from "./notes";
+export * from "./devices";

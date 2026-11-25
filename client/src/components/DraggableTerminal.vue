@@ -233,7 +233,7 @@ export default {
     connectWebSocket() {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const env = dataCenter.env.value;
-      const wsUrl = `${protocol}//${window.location.host}/terminal/${encodeURIComponent(env)}?token=${encodeURIComponent(dataCenter.token.value)}`;
+      const wsUrl = `${protocol}//${window.location.host}/terminal/${encodeURIComponent(env)}?token=${encodeURIComponent(dataCenter.token.value)}&deviceId=${encodeURIComponent(dataCenter.deviceId)}`;
 
       this.terminal.writeln("正在连接到服务器...");
       console.log('[Terminal] 连接WebSocket:', `${protocol}//${window.location.host}/terminal/${encodeURIComponent(env)}`);

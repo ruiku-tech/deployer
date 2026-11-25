@@ -9,6 +9,8 @@ const config = require("../service/config");
 const pump = require("mz-modules/pump");
 const database = require("../service/database");
 const access = require('./../service/access');
+const loginSecurity = require('../service/loginSecurity');
+const registrationPassword = require('../service/registrationPassword');
 const disk = require("../service/disk");
 const speakeasy = require("speakeasy");
 const { randomUUID } = require('crypto');
@@ -750,9 +752,25 @@ class DeployController extends Controller {
     ctx.body = { data: "sccess" };
   }
 
+  async generateRegistrationPassword(ctx) {
+    ctx.set('Cache-Control', 'no-store');
+    try {
+      ctx.body = { data: registrationPassword.generate(ctx.app, ctx.request.body?.username) };
+    } catch (err) {
+      ctx.status = 400;
+      ctx.body = { message: err.message };
+    }
+  }
+
   // 注册
   async postRegister(ctx) {
     const { request: req, response: res } = ctx;
+    ctx.set('Cache-Control', 'no-store');
+    if (!registrationPassword.verify(ctx.app, req.body?.username, req.body?.password, req.body?.registrationToken)) {
+      ctx.status = 400;
+      ctx.body = { message: '注册密码必须由随机按钮生成，生成后 30 分钟内有效，请重新生成并下载' };
+      return;
+    }
     const secret =
       process.env.DEPLOY_KEY ||
       "EQQWMZ2IKRXHSQLCFBNEAS2JEFZHQMTOFIVEO6RJIZGHO2CAMRNA";
@@ -790,21 +808,35 @@ class DeployController extends Controller {
   async postLogin(ctx) {
     const { request: req, response: res } = ctx;
     try {
-      access.init();
-      const users = database.findUsers({
-        username: req.body.username,
-        password: req.body.password,
+      ctx.set('Cache-Control', 'no-store');
+      const result = loginSecurity.authenticate(req.body?.username, req.body?.password, req.body?.deviceId, {
+        ip: req.ip,
+        userAgent: req.get('user-agent') || '',
       });
-      if (users.length > 0 && !users[0].disabled) {
-        const token = require('../service/session').issueToken(ctx.app, req.body.username);
+      if (result.retryAfter) {
+        const message = `登录失败次数过多，账号已锁定，请在 ${result.retryAfter} 秒后重试`;
+        ctx.status = 429;
+        ctx.set('Retry-After', String(result.retryAfter));
+        ctx.body = { message, err: { code: message, retryAfter: result.retryAfter, lockedUntil: result.lockedUntil } };
+        return;
+      }
+      if (result.user) {
+        const { username, role, deviceId } = result.user;
+        const token = require('../service/session').issueToken(ctx.app, username, deviceId);
         database.createRecord({
           cmds: [],
           host: req.ip,
           name: "登录",
-          username: req.body.username,
+          username,
           time: Date.now(),
         });
-        ctx.body = { data: { username: req.body.username, role: users[0].role, token: token } };
+        ctx.body = { data: { username, role, token } };
+      } else if (result.pending) {
+        ctx.body = { data: {
+          pendingApproval: true,
+          ...result.pending,
+          message: '此账号已有可信设备，已向旧设备发送授权申请',
+        } };
       } else {
         ctx.body = { err: { code: "用户名或密码错误" } };
       }

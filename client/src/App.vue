@@ -1,7 +1,7 @@
 <template>
   <Login v-if="!dataCenter.token"></Login>
   <div class="main" v-if="dataCenter.token">
-    <header class="topbar"><strong>部署管理平台</strong><div class="top-actions"><span v-if="disk">磁盘已用 {{ formatSize(disk.total - disk.free) }} / {{ formatSize(disk.total) }}（可用 {{ formatSize(disk.free) }}）</span><EnvSwitch /><el-button v-if="canManageVersions" text title="版本管理（Ctrl + U，Mac 也支持 Command + U）" @click="updateDialogVisible = true">版本管理</el-button><el-button text @click="logout">退出</el-button></div></header>
+    <header class="topbar"><strong>部署管理平台</strong><div class="top-actions"><span v-if="disk">磁盘已用 {{ formatSize(disk.total - disk.free) }} / {{ formatSize(disk.total) }}（可用 {{ formatSize(disk.free) }}）</span><EnvSwitch /><DeviceApprovals /><el-button v-if="canManageVersions" text title="版本管理（Ctrl + U，Mac 也支持 Command + U）" @click="updateDialogVisible = true">版本管理</el-button><el-button text @click="logout">退出</el-button></div></header>
     <Operator />
     <el-button class="log-button" type="primary" @click="logVisible = true">部署日志</el-button>
     <div v-show="logVisible" class="log-panel" :class="{ fullscreen: logFullscreen }">
@@ -20,6 +20,7 @@ import service from "./api/base";
 import EnvSwitch from "./components/EnvSwitch.vue";
 import Confirm from "./components/Confirm.vue";
 import UpdateDialog from "./components/UpdateDialog.vue";
+import DeviceApprovals from "./components/DeviceApprovals.vue";
 
 import Login from "./components/Login.vue";
 import dataCenter from "./dataCenter";
@@ -45,6 +46,7 @@ export default {
     Confirm,
     Login,
     UpdateDialog,
+    DeviceApprovals,
   },
   mounted() {
     window.addEventListener('keydown', this.onVersionShortcut);

@@ -180,9 +180,14 @@ module.exports = (app) => {
   );
 
   // 注册
+  router.post('/deploy/register/password', controller.deploy.generateRegistrationPassword);
   router.post("/deploy/register", controller.deploy.postRegister);
   // 登陆
   router.post("/deploy/login", controller.deploy.postLogin);
+  router.post('/deploy/device/status', controller.device.status);
+  router.get('/deploy/device/requests', auth, controller.device.requests);
+  router.post('/deploy/device/approve', auth, controller.device.approve);
+  router.post('/deploy/device/deny', auth, controller.device.deny);
   // 自更新
   router.post("/deploy/selfupdate", auth, controller.deploy.selfUpdate);
   // 获取版本信息
