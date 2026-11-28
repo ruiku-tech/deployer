@@ -13,6 +13,9 @@ const RUN_CMD = "run:";
 const PUT_CMD = "put:";
 const TEXT_TYPE = "TEXT";
 const COMMAND_IDLE_WARNING_MS = 120000;
+const MAX_OUTPUT_LINES_PER_COMMAND = 2000;
+const MAX_OUTPUT_LINE_LENGTH = 8192;
+const MAX_OUTPUT_BYTES_PER_COMMAND = 1024 * 1024;
 const INTERACTION_PROMPT = /(?:\[(?:y\s*\/\s*n|y\/n|yes\/no)(?:\s*\])|\(y\/(?:n|N)\)|password\s*:\s*$|passphrase\s*:\s*$|press\s+(?:enter|return)|continue\s*\?\s*(?:\[|\(|$)|\[sudo\]\s+password\s+for|select\s+(?:an?\s+)?option\s*:?\s*$)/im;
 
 const deploying = [];
@@ -93,7 +96,13 @@ class ExecuterService extends Service {
       let idleTimer;
       let settled = false;
       let interactionWarningSent = false;
+      let outputLineCount = 0;
+      let outputTruncated = false;
       const idleWarningMs = this.commandIdleWarningMs || COMMAND_IDLE_WARNING_MS;
+      const outputLineLimit = this.maxOutputLinesPerCommand || MAX_OUTPUT_LINES_PER_COMMAND;
+      const outputLineLengthLimit = this.maxOutputLineLength || MAX_OUTPUT_LINE_LENGTH;
+      const outputByteLimit = this.maxOutputBytesPerCommand || MAX_OUTPUT_BYTES_PER_COMMAND;
+      let outputByteCount = 0;
       const finish = (error) => {
         if (settled) return;
         settled = true;
@@ -104,18 +113,48 @@ class ExecuterService extends Service {
       const output = (channel, data, final = false) => {
         const previous = channel === 'stderr' ? stderrBuffer : stdoutBuffer;
         const normalized = `${previous}${data ? data.toString() : ''}`.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        if (!interactionWarningSent && INTERACTION_PROMPT.test(normalized)) {
+        if (!interactionWarningSent && INTERACTION_PROMPT.test(normalized.slice(-4096))) {
           interactionWarningSent = true;
           broadcast.cast(`WARN:[${conn.host}] 检测到命令可能正在等待交互输入。部署日志不支持输入应答；请使用非交互参数，或取消该服务器的部署。`, env);
         }
-        const lines = normalized.split('\n');
-        const remaining = final ? '' : lines.pop();
-        if (channel === 'stderr') stderrBuffer = remaining;
-        else stdoutBuffer = remaining;
-        for (const line of lines) {
-          if (!line) continue;
-          if (channel === 'stderr') lastStderr = `${lastStderr}${line}\n`.slice(-2000);
-          broadcast.cast(`INFO:[${conn.host}] ${channel === 'stderr' ? '[stderr] ' : ''}${line}`, env);
+        const parts = normalized.split('\n');
+        const remaining = final ? '' : parts.pop();
+        if (channel === 'stderr') stderrBuffer = '';
+        else stdoutBuffer = '';
+        const emitLine = line => {
+          for (let offset = 0; offset < line.length; offset += outputLineLengthLimit) {
+            const fragment = line.slice(offset, offset + outputLineLengthLimit);
+            const fragmentBytes = Buffer.byteLength(fragment);
+            if (outputTruncated || outputLineCount >= outputLineLimit || outputByteCount + fragmentBytes > outputByteLimit) {
+              if (!outputTruncated) {
+                outputTruncated = true;
+                broadcast.cast(`WARN:[${conn.host}] 单条命令日志已达到上限（${outputLineLimit} 条或 ${Math.round(outputByteLimit / 1024)} KiB），后续输出不再转发。`, env);
+              }
+              return;
+            }
+            outputLineCount++;
+            outputByteCount += fragmentBytes;
+            if (channel === 'stderr') lastStderr = `${lastStderr}${fragment}\n`.slice(-2000);
+            broadcast.cast(`INFO:[${conn.host}] ${channel === 'stderr' ? '[stderr] ' : ''}${fragment}`, env);
+          }
+        };
+        for (const line of parts) {
+          if (line) emitLine(line);
+        }
+        if (remaining) {
+          let offset = 0;
+          while (remaining.length - offset > outputLineLengthLimit && outputLineCount < outputLineLimit && !outputTruncated) {
+            emitLine(remaining.slice(offset, offset + outputLineLengthLimit));
+            offset += outputLineLengthLimit;
+          }
+          const hasMoreOutput = remaining.length - offset > 0;
+          const buffered = (outputTruncated || outputLineCount >= outputLineLimit) && hasMoreOutput ? '' : remaining.slice(offset);
+          if (channel === 'stderr') stderrBuffer = buffered;
+          else stdoutBuffer = buffered;
+          if (outputLineCount >= outputLineLimit && hasMoreOutput && !outputTruncated) {
+            outputTruncated = true;
+            broadcast.cast(`WARN:[${conn.host}] 单条命令日志已达到上限（${outputLineLimit} 条或 ${Math.round(outputByteLimit / 1024)} KiB），后续输出不再转发。`, env);
+          }
         }
       };
       const resetIdleTimer = () => {

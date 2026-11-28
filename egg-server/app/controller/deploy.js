@@ -705,7 +705,7 @@ class DeployController extends Controller {
     const { request: req } = ctx;
     const env = req.headers.env;
     ctx.assert(!req.body.env || req.body.env === env, 400, '环境不匹配');
-    const payload = { list: req.body.list, files: req.body.files || {} };
+    const payload = { list: req.body.list, files: req.body.files || {}, texts: req.body.texts || {} };
     try {
       if (req.body.runAt) {
         const id = await ctx.service.releases.create(env, payload, ctx.state.user.username, Number(req.body.runAt));

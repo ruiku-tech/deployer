@@ -24,8 +24,9 @@ import Deploys from './Deploys.vue';
 import Record from './Record.vue';
 import Schedules from './Schedules.vue';
 import Teams from './Teams.vue';
+import Help from './Help.vue';
 import dataCenter from '../dataCenter';
-const pages = { files: Files, vars: Vars, hosts: Hosts, configs: Configs, scripts: Scripts, deploys: Deploys, record: Record, schedules: Schedules, teams: Teams };
+const pages = { files: Files, vars: Vars, hosts: Hosts, configs: Configs, scripts: Scripts, deploys: Deploys, record: Record, schedules: Schedules, teams: Teams, help: Help };
 export default {
   data() { return { active: 'files', visited: [] }; },
   computed: {
@@ -37,6 +38,7 @@ export default {
       const items = this.currentEnv ? [ { name: 'files', label: '文件管理' }, { name: 'vars', label: '全局变量' }, { name: 'hosts', label: '服务器管理' }, { name: 'configs', label: '配置管理' }, { name: 'scripts', label: '脚本管理' }, { name: 'deploys', label: '部署编排' }, { name: 'record', label: '发布记录' } ] : [];
       items.push({ name: 'schedules', label: '定时发布' });
       if (this.isAdmin) items.push({ name: 'teams', label: '成员与分组' });
+      items.push({ name: 'help', label: '常见问题' });
       return items;
     },
     currentLabel() { return this.menus.find(x => x.name === this.active)?.label || '工作空间'; },

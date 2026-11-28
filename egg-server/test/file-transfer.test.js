@@ -111,6 +111,34 @@ test('SSH stderr is informational; only nonzero exits are errors, and interactiv
     assert.ok(logs.some(line => line.startsWith('ERR:[test-host]')));
 
     logs.length = 0;
+    const limitedService = Object.create(Executer.prototype);
+    limitedService.env = 'testing';
+    limitedService.maxOutputLinesPerCommand = 2;
+    limitedService.maxOutputLineLength = 4;
+    const limitedStream = new EventEmitter();
+    limitedStream.stderr = new EventEmitter();
+    const limited = limitedService.execute({ ...conn, exec: (cmd, callback) => callback(null, limitedStream) }, 'large output');
+    limitedStream.emit('data', Buffer.from('abcdefghij'));
+    limitedStream.emit('data', Buffer.from('more output'));
+    limitedStream.emit('close', 0, undefined);
+    await limited;
+    assert.equal(logs.filter(line => line.startsWith('INFO:[test-host]')).length, 2);
+    assert.ok(logs.some(line => line.startsWith('WARN:') && /日志已达到上限/.test(line)));
+
+    logs.length = 0;
+    const byteLimitedService = Object.create(Executer.prototype);
+    byteLimitedService.env = 'testing';
+    byteLimitedService.maxOutputBytesPerCommand = 5;
+    const byteLimitedStream = new EventEmitter();
+    byteLimitedStream.stderr = new EventEmitter();
+    const byteLimited = byteLimitedService.execute({ ...conn, exec: (cmd, callback) => callback(null, byteLimitedStream) }, 'large output');
+    byteLimitedStream.emit('data', Buffer.from('abcdef\n'));
+    byteLimitedStream.emit('close', 0, undefined);
+    await byteLimited;
+    assert.equal(logs.filter(line => line.startsWith('INFO:[test-host]')).length, 0);
+    assert.ok(logs.some(line => line.startsWith('WARN:') && /日志已达到上限/.test(line)));
+
+    logs.length = 0;
     const idleService = Object.create(Executer.prototype);
     idleService.env = 'testing';
     idleService.commandIdleWarningMs = 5;
