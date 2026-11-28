@@ -1,558 +1,145 @@
-# 部署命令编写规则文档
+# 部署脚本生成指南
 
-本文档详细说明部署系统支持的所有命令指令及其使用方法，方便为其他项目自动生成部署脚本。
+本文档供其他工程的开发人员和自动化工具使用，用于根据项目的构建产物、配置和部署步骤，生成可在部署平台中执行的脚本。脚本由部署平台连接目标服务器，通过 SFTP 上传文件，再通过 SSH 执行命令。
 
----
+## 生成约定
 
-## 一、命令结构概述
+部署脚本是逐行执行的命令列表。每个非空、非注释行必须以 `put:` 或 `run:` 开始；其他前缀会在部署前被拒绝。
 
-部署脚本由**多行命令**组成，每行一条指令。系统按顺序执行，支持动态替换、文件传输、远程执行等操作。
-
-**基本格式：**
-```
-<命令前缀>: <命令内容>
+```text
+put: [FILE:构建产物名称],/目标服务器上的绝对路径
+run: 目标服务器 shell 命令
 ```
 
-**重要限制：**
-- ⚠️ **每条命令必须写在一行**，不支持 Shell 的 `\` 续行符
-- 系统按 `\n` 换行符分割命令，每行独立执行
+以 `#` 开头的行是注释，空行会忽略。每个 `run:` 是单独的 SSH exec 命令，不是持续打开的终端会话；不要依赖跨行 shell 状态、shell 变量或交互式输入。需要多步 shell 逻辑时，将完整脚本作为文件上传，再用单行 `run: bash /path/to/script.sh` 执行。
 
-**注释规则：**
-- 以 `#` 开头的行视为注释，会被忽略
-- 空行会被过滤
+自动生成脚本时，应先确认这些信息：
 
----
+- 构建产物名称及它在平台文件管理中的名称。
+- 目标服务器上的安装目录、文件名和服务名。
+- 发布前后需要执行的命令及其顺序。
+- 配置中需使用的平台变量、配置模板、服务器标识和运行时参数。
+- 每一步是否可重复执行，以及失败时应该由非零退出码中止发布。
 
-## 二、动态占位符（Dynamic Placeholders）
+生成结果只使用 `put:` 和 `run:`，不要生成平台本地 shell 命令或其他命令前缀。
 
-命令内容中可使用占位符，系统会在执行前自动替换为实际值。
+## 命令
 
-**重要说明：** 这些占位符引用的内容（变量、文件、配置、服务器）必须提前在**部署平台 Web 界面**中配置或上传：
-- **变量（VAR）**：在"变量管理"模块配置
-- **文件（FILE）**：在"文件管理"模块上传
-- **配置（CONF）**：在"配置管理"模块创建模板文件
-- **服务器（HOST）**：在"服务器管理"模块添加服务器信息
+### `put:` 上传文件
 
-### 2.1 `[VAR:变量名]` - 变量替换
-
-**作用：** 引用系统预定义或用户配置的变量值。
-
-**示例：**
-```bash
-run: docker run -e TZ=[VAR:MYSQL_ZONE] myapp
+```text
+put: <本地来源>,<远程目标路径>
 ```
 
-- 假设 `MYSQL_ZONE` 变量值为 `Asia/Shanghai`
-- 最终执行：`docker run -e TZ=Asia/Shanghai myapp`
-
-**常见变量场景：**
-- 时区配置：`[VAR:MYSQL_ZONE]`
-- 数据库连接：`[VAR:DB_HOST]`、`[VAR:DB_PORT]`
-- API 密钥：`[VAR:API_KEY]`
-
----
-
-### 2.2 `[FILE:文件标识]` - 本地文件路径
-
-**作用：** 引用本地上传的文件实际存储路径。
-
-**示例：**
-```bash
-put: [FILE:server.jar],/root/main-server/server.jar
-```
-
-- `server.jar` 是用户上传时的文件标识（通常是原文件名）
-- 系统会找到该文件在服务器本地的实际路径（如 `/data/deployer/files/abc123.jar`）
-- 最终执行上传：本地 `/data/deployer/files/abc123.jar` → 远程 `/root/main-server/server.jar`
-
-**注意事项：**
-- 文件必须提前上传到部署系统的文件管理区
-- 文件标识通常为上传时的原始文件名
-
----
-
-### 2.3 `[CONF:配置文件名]` - 配置模板
-
-**作用：** 引用配置文件模板，支持**递归替换**模板内的占位符。
-
-**示例：**
-```bash
-put: [CONF:server.yml],/root/main-server/server.yml
-```
-
-**配置文件 `server.yml` 内容：**
-```yaml
-server:
-  port: 8080
-database:
-  host: [VAR:DB_HOST]
-  port: [VAR:DB_PORT]
-timezone: [VAR:MYSQL_ZONE]
-```
-
-**执行流程：**
-1. 读取 `server.yml` 模板
-2. 替换其中的 `[VAR:...]` 占位符
-3. 如果配置内容**有变化**，生成临时文件（如 `/tmp/20260813-15:23:45~server.yml`）
-4. 上传临时文件到远程 `/root/main-server/server.yml`
-
-**递归替换：**
-- 配置文件内可以嵌套引用其他配置：`include: [CONF:database.yml]`
-- 系统会递归解析，但会检测循环引用并报错
-
----
-
-### 2.4 `[HOST:服务器标识]` - 服务器地址
-
-**作用：** 引用已配置的服务器 IP 地址。
-
-**示例：**
-```bash
-run: scp [HOST:backup-server]:/data/backup.tar.gz /tmp/
-```
-
-- `backup-server` 是服务器配置中的标识名
-- 系统会替换为实际 IP，如 `192.168.1.100`
-- 最终执行：`scp 192.168.1.100:/data/backup.tar.gz /tmp/`
-
-**特殊值：**
-- `[HOST:$SELF]` - 当前执行部署的目标服务器自身的 IP
-
----
-
-## 三、核心命令
-
-### 3.1 `put:` - 上传文件
-
-**语法：**
-```
-put: <本地路径>,<远程路径>
-```
-
-**功能：** 通过 SFTP 上传文件到远程服务器。
-
-**示例：**
-```bash
-# 上传 JAR 包
-put: [FILE:server.jar],/root/main-server/server.jar
-
-# 上传配置文件（会自动替换配置内占位符）
-put: [CONF:application.yml],/etc/myapp/application.yml
-
-# 直接路径（不推荐，应使用占位符）
-put: /tmp/build.tar.gz,/opt/releases/build.tar.gz
-```
-
-**执行过程：**
-- 显示上传进度（每秒更新一次百分比）
-- 自动创建远程目标目录（如果不存在）
-- 失败时会广播错误信息
-
----
-
-### 3.2 `get:` - 下载文件
-
-**语法：**
-```
-get: <远程路径>,<本地路径>
-```
-
-**功能：** 从远程服务器下载文件到部署系统本地。
-
-**示例：**
-```bash
-# 下载日志文件
-get: /var/log/myapp/error.log,/tmp/error.log
-
-# 备份数据库
-get: /root/backup.sql,/data/backups/backup-[VAR:DATE].sql
-```
-
-**执行过程：**
-- 显示下载进度
-- 本地路径可使用变量动态生成文件名
-
----
-
-### 3.3 `run:` - 执行远程命令
-
-**语法：**
-```
-run: <Shell 命令>
-```
-
-**功能：** 在远程服务器执行任意 Shell 命令。
-
-**示例：**
-```bash
-# Docker 容器管理
-run: docker stop server
-run: docker rm server
-run: docker run -dit --name server --network=host -v /root/logs:/logs myapp:latest
-
-# 文件操作
-run: mkdir -p /opt/myapp
-run: chmod +x /opt/myapp/start.sh
-run: rm -rf /tmp/old-data
-
-# 服务管理
-run: systemctl restart nginx
-run: pm2 restart app
-
-# 条件执行
-run: [ -f /root/backup.tar.gz ] && rm /root/backup.tar.gz
-```
-
-**输出处理：**
-- 标准输出（stdout）逐行实时显示
-- 标准错误（stderr）以红色 `ERR` 标签显示
-- 命令返回非 0 退出码时会中断部署流程
-
----
-
-### 3.4 `rquery:` - 执行查询并存储结果
-
-**语法：**
-```
-rquery: <Shell 命令>
-```
-
-**功能：** 执行命令并将**完整输出**保存到**寄存器**（register），供后续命令使用。
-
-**示例：**
-```bash
-# 查询容器 ID
-rquery: docker ps -q -f name=server
-
-# 后续命令可通过 $[0] 引用寄存器内容
-run: docker logs $[0]
-```
-
-**与 `run:` 的区别：**
-- `run:` 输出直接显示给用户，不保存
-- `rquery:` 输出不显示，存入寄存器供后续引用
-
----
-
-### 3.5 `spush:` - 压入寄存器栈
-
-**语法：**
-```
-spush:
-```
-
-**功能：** 将当前寄存器值压入栈，保护现场。
-
-**示例：**
-```bash
-rquery: docker ps -q -f name=server
-spush:
-rquery: docker ps -q -f name=backup
-run: docker cp $[0]:/data /backup  # 使用 backup 容器 ID
-spop:
-run: docker restart $[0]  # 使用 server 容器 ID（从栈恢复）
-```
-
----
-
-### 3.6 `spop:` - 弹出寄存器栈
-
-**语法：**
-```
-spop:
-```
-
-**功能：** 从栈中弹出值并恢复到寄存器。
-
----
-
-### 3.7 `reval:` - 执行 JavaScript 表达式
-
-**语法：**
-```
-reval: <JavaScript 表达式>
-```
-
-**功能：** 对寄存器内容执行 JavaScript 计算，结果写回寄存器。
-
-**示例：**
-```bash
-rquery: cat /proc/meminfo | grep MemTotal | awk '{print $2}'
-reval: Math.floor($ / 1024)  # $ 代表寄存器当前值
-run: echo "内存大小: $[0] MB"
-```
-
-**可用变量：**
-- `$` - 当前寄存器值
-- 支持所有 JavaScript 标准库（Math、String、Array 等）
-
----
-
-### 3.8 `update:` - 更新全局变量
-
-**语法：**
-```
-update: <变量名>=<变量值>
-```
-
-**功能：** 动态修改全局变量配置，影响后续所有部署任务。
-
-**示例：**
-```bash
-# 更新版本号
-rquery: cat /opt/myapp/version.txt
-update: APP_VERSION=$[0]
-
-# 后续脚本可使用新变量
-run: echo "当前版本: [VAR:APP_VERSION]"
-```
-
----
-
-## 四、寄存器与栈操作
-
-### 4.1 寄存器引用 `$[N]`
-
-**语法：** `$[0]` 表示栈顶，`$[1]` 表示栈顶下一层，以此类推。
-
-**示例：**
-```bash
-rquery: ls /data | wc -l
-spush:
-rquery: df -h | grep /data | awk '{print $5}'
-run: echo "文件数: $[1], 磁盘使用: $[0]"
-```
-
-**规则：**
-- `$[0]` = 栈顶（最新值）
-- `$[1]` = 栈顶 -1
-- `$[N]` = 栈顶 -N
-- 空栈引用返回空字符串
-
----
-
-## 五、完整部署示例
-
-### 示例 1：Spring Boot 应用部署
+通常使用 `[FILE:...]` 选择本次部署上传的构建产物：
 
 ```bash
-# 1. 上传文件
-put: [FILE:server.jar],/root/main-server/server.jar
-put: [CONF:application.yml],/root/main-server/application.yml
-
-# 2. 停止旧容器
-run: docker stop server
-run: docker rm server
-
-# 3. 清理调试容器（如果存在）
-run: docker stop debug-server 2>/dev/null || true
-run: docker rm debug-server 2>/dev/null || true
-
-# 4. 启动新容器（注意：命令必须写在一行，不支持 \ 续行符）
-run: docker run -dit --name server --network=host -e TZ=[VAR:MYSQL_ZONE] -e SPRING_PROFILES_ACTIVE=prod -v /root/logs:/logs -v /root/main-server:/app openjdk:17-slim java -jar /app/server.jar
-
-# 5. 等待启动并检查健康状态
-run: sleep 10
-rquery: docker logs --tail 20 server | grep "Started Application"
-reval: $.includes("Started") ? "SUCCESS" : "FAILED"
-run: echo "启动状态: $[0]"
+put: [FILE:service.jar],/opt/example/service.jar
+put: [FILE:release.tar.gz],/tmp/release.tar.gz
 ```
 
----
-
-### 示例 2：前端静态资源部署
+配置模板可以用 `[CONF:...]` 生成实际上传来源：
 
 ```bash
-# 1. 上传构建产物
-put: [FILE:dist.tar.gz],/tmp/dist.tar.gz
-
-# 2. 解压到 Nginx 目录
-run: mkdir -p /var/www/myapp
-run: tar -xzf /tmp/dist.tar.gz -C /var/www/myapp
-
-# 3. 更新 Nginx 配置
-put: [CONF:nginx.conf],/etc/nginx/sites-available/myapp.conf
-run: ln -sf /etc/nginx/sites-available/myapp.conf /etc/nginx/sites-enabled/
-
-# 4. 测试并重载 Nginx
-run: nginx -t
-run: systemctl reload nginx
-
-# 5. 清理临时文件
-run: rm /tmp/dist.tar.gz
+put: [CONF:application.yml],/opt/example/application.yml
 ```
 
----
+本地来源必须是当前环境 `files`、`configs` 或 `temp` 目录中的普通文件。不能指定平台机器上的任意路径、目录或符号链接。配置模板含有动态占位符时，平台会先生成临时配置文件；没有变化时则直接使用模板文件。
 
-### 示例 3：数据库迁移
+远程目标路径应写成完整文件路径，且其父目录必须已存在。`put:` 只负责上传，不会自动在远程服务器创建目录。
+
+### `run:` 执行远程命令
+
+```text
+run: <目标服务器上的 shell 命令>
+```
+
+示例：
 
 ```bash
-# 1. 备份当前数据库
-rquery: date +%Y%m%d-%H%M%S
-update: BACKUP_TIME=$[0]
-run: mysqldump -u root -p[VAR:DB_PASSWORD] mydb > /backup/mydb-[VAR:BACKUP_TIME].sql
-
-# 2. 上传迁移脚本
-put: [FILE:migrate.sql],/tmp/migrate.sql
-
-# 3. 执行迁移
-run: mysql -u root -p[VAR:DB_PASSWORD] mydb < /tmp/migrate.sql
-
-# 4. 验证迁移结果
-rquery: mysql -u root -p[VAR:DB_PASSWORD] -e "SELECT COUNT(*) FROM new_table" mydb
-run: echo "新表记录数: $[0]"
-
-# 5. 清理
-run: rm /tmp/migrate.sql
+run: mkdir -p /opt/example
+run: systemctl restart example
+run: systemctl is-active --quiet example
 ```
 
----
+`run:` 在目标服务器执行 shell 命令。退出码非零会使当前部署项失败。脚本作者应只生成目标工程所需的远程命令，并谨慎处理 `rm`、权限修改和数据迁移等有破坏性的操作。
 
-## 六、最佳实践
+## 动态占位符
 
-### 6.1 错误处理
+占位符可以出现在 `run:` 命令和配置模板中。引用的资源需预先在当前环境配置。
+
+| 占位符 | 用途 | 示例 |
+| --- | --- | --- |
+| `[VAR:变量名]` | 替换全局变量 | `[VAR:APP_PORT]` |
+| `[FILE:文件名]` | 选择本次部署上传的文件 | `[FILE:service.jar]` |
+| `[CONF:配置名]` | 展开配置模板；支持嵌套配置 | `[CONF:application.yml]` |
+| `[HOST:服务器名]` | 替换为服务器地址 | `[HOST:production-1]` |
+| `[HOST:$SELF]` | 替换为当前目标服务器地址 | `[HOST:$SELF]` |
+| `[TEXT:提示文字]` | 在部署确认窗口输入单行参数 | `[TEXT:演示分钟数]` |
+
+相同的 `TEXT` 提示在一次发布中只要求输入一次。参数不能为空，最长 4096 个字符，不允许换行。平台按原文替换 `TEXT`，不会自动进行 shell 转义；请在脚本中将占位符放在合适的参数位置，并避免让用户输入 shell 语法。
+
+配置模板可以嵌套引用其他配置，循环引用会被拒绝。`FILE` 可在配置模板中使用，运行时仍会由操作者在发布确认窗口选择实际文件。
+
+## 文件管理和克隆
+
+`[FILE:name]` 中的 `name` 对应当前环境文件管理中的文件名。每个被引用的文件都会在发布确认窗口中显示，操作者为它选择实际上传文件。未选择必需文件时不能开始发布。
+
+配置和脚本可以从列表中的“克隆”复制到另一个有访问权限的环境。平台会先显示目标环境的现有配置或脚本；如果目标已有相同名称，克隆会被拒绝，不会覆盖。克隆后可在目标环境编辑相似但不同的内容。
+
+## 非交互脚本
+
+SSH 执行使用非交互通道，不会打开终端供部署人员回答提示。安装包、包管理器和初始化工具应选择非交互选项，例如：
 
 ```bash
-# ✅ 推荐：忽略非关键命令的错误
-run: docker stop old-container 2>/dev/null || true
-
-# ❌ 不推荐：错误会中断整个流程
-run: docker stop old-container
+run: DEBIAN_FRONTEND=noninteractive apt-get install -y nginx
+run: yum install -y nginx
+run: dnf install -y nginx
 ```
 
-### 6.2 幂等性设计
+部署命令通过不带 PTY 的 SSH exec 通道运行，无法通用判断远端进程是否正在等待输入。平台会识别常见提示（如 `[Y/n]`、`password:`、`Press Enter`），并发出交互输入警告；120 秒没有输出但没有匹配提示时也会提醒命令仍在运行。**空闲提醒不会自动终止命令**，操作者可观察日志，或使用服务器项旁的取消按钮中止。安装和包管理命令仍应显式使用 `-y`、`--assume-yes` 等非交互参数。
+
+stdout 和 stderr 都会作为普通日志显示。Docker 等程序常把正常进度写入 stderr，因此 stderr 本身不代表失败。命令以非零退出码结束、SSH 连接失败或命令超时才会产生错误日志；前端以红色显示真正的 `ERR` 日志。
+
+## 示例
+
+### Java 服务
 
 ```bash
-# ✅ 推荐：先检查再操作
-run: [ ! -d /opt/myapp ] && mkdir -p /opt/myapp
-
-# ✅ 推荐：强制覆盖
-run: ln -sf /path/to/source /path/to/link
+# 本次上传选择 service.jar，远程安装目录应已创建。
+put: [FILE:service.jar],/opt/example/service.jar
+put: [CONF:application.yml],/opt/example/application.yml
+run: systemctl restart example
+run: systemctl is-active --quiet example
 ```
 
-### 6.3 敏感信息保护
+### Docker 服务
 
 ```bash
-# ✅ 推荐：使用变量
-run: mysql -u root -p[VAR:DB_PASSWORD] ...
-
-# ❌ 禁止：硬编码密码
-run: mysql -u root -pMyPassword123 ...
+put: [FILE:compose.yaml],/opt/example/compose.yaml
+run: docker pull [VAR:IMAGE_NAME]:[TEXT:发布版本]
+run: docker compose -f /opt/example/compose.yaml up -d
+run: docker compose -f /opt/example/compose.yaml ps
 ```
 
-### 6.4 日志与调试
+### 生成后执行部署脚本
+
+把完整的多行部署脚本作为构建产物上传到当前环境的文件管理，再由脚本命令调用：
 
 ```bash
-# 关键步骤添加回显
-run: echo "========== 开始部署服务 =========="
-run: docker ps -a | grep myapp
-run: echo "========== 部署完成 =========="
+put: [FILE:deploy.sh],/tmp/example-deploy.sh
+run: chmod 700 /tmp/example-deploy.sh
+run: bash /tmp/example-deploy.sh
 ```
 
----
+## 自动生成检查清单
 
-## 七、系统架构说明
+为其他工程生成部署脚本时，确认以下事项：
 
-### 7.1 执行流程
-
-```
-用户触发部署
-    ↓
-读取脚本文件
-    ↓
-解析占位符（VAR/FILE/CONF/HOST）
-    ↓
-建立 SSH 连接
-    ↓
-逐行执行命令
-    ↓
-实时广播日志
-    ↓
-连接复用 3 分钟（避免频繁重连）
-```
-
-### 7.2 连接管理
-
-- 同一服务器的连接会**缓存 3 分钟**
-- 3 分钟内无新任务自动断开
-- 支持**并发部署**到不同服务器
-
-### 7.3 错误处理
-
-- 命令执行失败（退出码非 0）→ 中断流程
-- SSH 连接断开 → 自动清理，下次重建
-- 文件上传失败 → 广播错误，中断流程
-
----
-
-## 八、常见问题
-
-### Q1: 如何调试脚本？
-
-**答：** 添加中间步骤回显：
-```bash
-run: echo "当前目录内容:"
-run: ls -la /opt/myapp
-run: echo "环境变量:"
-run: env | grep APP_
-```
-
-### Q2: 如何处理条件分支？
-
-**答：** 使用 Shell 条件语句：
-```bash
-run: if [ -f /opt/myapp/config.yml ]; then echo "配置存在"; else echo "配置缺失"; exit 1; fi
-```
-
-### Q3: 如何执行多行脚本？
-
-**答：** 方法一 - 上传脚本文件：
-```bash
-put: [FILE:deploy.sh],/tmp/deploy.sh
-run: chmod +x /tmp/deploy.sh
-run: /tmp/deploy.sh
-```
-
-方法二 - 使用 heredoc：
-```bash
-run: bash <<'EOF'
-  cd /opt/myapp
-  npm install
-  npm run build
-EOF
-```
-
----
-
-## 九、命令速查表
-
-| 命令         | 作用                     | 示例                                  |
-|--------------|--------------------------|---------------------------------------|
-| `put:`       | 上传文件                 | `put: [FILE:app.jar],/opt/app.jar`    |
-| `get:`       | 下载文件                 | `get: /var/log/app.log,/tmp/log.txt`  |
-| `run:`       | 执行 Shell 命令          | `run: docker restart myapp`           |
-| `rquery:`    | 查询并保存到寄存器       | `rquery: cat /proc/loadavg`           |
-| `spush:`     | 压栈                     | `spush:`                              |
-| `spop:`      | 出栈                     | `spop:`                               |
-| `reval:`     | 执行 JS 表达式           | `reval: parseInt($) * 2`              |
-| `update:`    | 更新全局变量             | `update: VERSION=1.2.3`               |
-| `[VAR:...]`  | 引用变量                 | `[VAR:DB_HOST]`                       |
-| `[FILE:...]` | 引用上传文件路径         | `[FILE:app.jar]`                      |
-| `[CONF:...]` | 引用配置模板（递归替换） | `[CONF:database.yml]`                 |
-| `[HOST:...]` | 引用服务器 IP            | `[HOST:backup-server]`                |
-| `$[N]`       | 引用栈值                 | `$[0]` 栈顶，`$[1]` 次栈顶            |
-
----
-
-## 十、扩展阅读
-
-- **变量管理**：在 Web 界面"变量管理"模块配置全局变量
-- **文件管理**：在"文件管理"模块上传 JAR/ZIP/配置文件
-- **服务器配置**：在"服务器管理"模块添加服务器信息（IP、密码/密钥）
-- **日志查看**：部署过程中右侧日志窗口实时显示所有操作输出
-
----
-
-**文档版本：** v1.0  
-**更新日期：** 2026-08-13  
-**维护者：** 部署系统开发团队
+- 每行只使用 `put:` 或 `run:`；注释独占一行并以 `#` 开头。
+- 构建产物通过 `[FILE:...]` 选择，不引用平台机器的任意路径。
+- `put:` 目标的远程父目录已经创建。
+- 环境差异优先通过 `[VAR:...]`、`[CONF:...]`、`[HOST:...]` 和 `[TEXT:...]` 表达，不硬编码密钥。
+- 安装和配置命令采用非交互参数，不等待键盘输入。
+- 发布完成后检查服务状态或健康检查，并让失败检查返回非零退出码。
+- 不生成 `get:`、`spush:`、`spop:`、`reval:`、`rquery:`、`update:` 等已移除命令，也不使用 `$[N]` 寄存器语法。

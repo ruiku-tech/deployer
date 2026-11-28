@@ -24,7 +24,12 @@ class Releases extends Service {
     for (const name of Object.values(files)) {
       if (typeof name !== 'string' || /[\\/\0]/.test(name) || ['.', '..'].includes(name)) throw new Error('部署文件无效');
     }
-    const parsed = this.ctx.service.executer.parse(env, { ...context, vars: utils.parseVars.call(context), hosts: utils.parseHosts.call(context), files }, payload.list);
+    const texts = payload.texts || {};
+    if (!texts || typeof texts !== 'object' || Array.isArray(texts)) throw new Error('运行时参数无效');
+    for (const value of Object.values(texts)) {
+      if (typeof value !== 'string' || value.length > 4096 || /[\r\n\0]/.test(value)) throw new Error('运行时参数无效');
+    }
+    const parsed = this.ctx.service.executer.parse(env, { ...context, vars: utils.parseVars.call(context), hosts: utils.parseHosts.call(context), files, texts }, payload.list);
     const errors = parsed.filter(x => x.err);
     if (errors.length) throw new Error(errors.map(x => x.err).join('，'));
     return parsed;

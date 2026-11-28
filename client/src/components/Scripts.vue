@@ -12,7 +12,7 @@
                 v-model="form.data"
                 :autosize="{ minRows: 2, maxRows: 20 }"
                 type="textarea"
-                placeholder="put: [FILE:文件名字],/root/dir \n run: docker run server -config [CONF:配置名字] --host [HOST:服务器名字] [VAR:变量]"
+                placeholder="put: [FILE:文件名字],/root/dir\nrun: docker run server -config [CONF:配置名字] --host [HOST:服务器名字] [VAR:变量] --duration [TEXT:演示分钟数]"
               />
             </el-form-item>
             <el-form-item label="备注" prop="note"><el-input v-model="form.note" /></el-form-item>
@@ -34,9 +34,10 @@
       </template>
       <el-table :data="list" style="width: 100%">
         <el-table-column prop="name" label="脚本名字"><template #default="scope">{{ scope.row.name }} <el-tooltip v-if="scope.row.note" :content="scope.row.note"><span class="note-icon">?</span></el-tooltip></template></el-table-column>
-        <el-table-column label="操作" width="240">
+        <el-table-column label="操作" width="300">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="edit(scope.row)">修改</el-button>
+            <el-button link type="primary" size="small" @click="openClone(scope.row)">克隆</el-button>
             <el-button link type="primary" size="small" @click="del(scope.row)">删除</el-button>
             <el-button link type="primary" size="small" @click="runTo(scope.row)">运行到</el-button>
             <el-button link type="warning" size="small" @click="checkUsage(scope.row)">检测使用</el-button>
@@ -44,6 +45,7 @@
         </el-table-column>
       </el-table>
     </el-card>
+    <ResourceCloneDialog v-model="cloneVisible" resource-type="script" :resource-name="cloneName" @cloned="fresh" />
   </div>
 
   <!-- 第一步：选择服务器 -->
@@ -102,10 +104,11 @@ import {
 } from "../api";
 import { confirmDelete } from "../utils";
 import DeployConfirm from "./DeployConfirm.vue";
+import ResourceCloneDialog from './ResourceCloneDialog.vue';
 
 export default {
   name: "scripts",
-  components: { DeployConfirm },
+  components: { DeployConfirm, ResourceCloneDialog },
   data() {
     return {
       list: [],
@@ -127,6 +130,8 @@ export default {
       // 检测使用
       usageDialogVisible: false,
       usageList: [],
+      cloneVisible: false,
+      cloneName: '',
     };
   },
   mounted() {
@@ -151,6 +156,7 @@ export default {
       });
       this.collapse = ["1"];
     },
+    openClone(item) { this.cloneName = item.name; this.cloneVisible = true; },
     save() {
       if (!this.form.name) {
         return ElMessage.error("请输入脚本名字");

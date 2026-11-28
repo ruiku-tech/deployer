@@ -3,22 +3,17 @@ const broadcast = require("./broadcast");
 const fs = require("fs");
 const path = require("path");
 const dayjs = require("dayjs");
-const utils = require("./utils");
 const { Service } = require("egg");
-const regExp = /\[(VAR|FILE|CONF|HOST):.+?\]/g;
-const funMap = {};
+const regExp = /\[(VAR|FILE|CONF|HOST|TEXT):\s*([^\]]+?)\]/g;
 const VAR_TYPE = "VAR";
 const FILE_TYPE = "FILE";
 const CFG_TYPE = "CONF";
 const HOST_TYPE = "HOST";
 const RUN_CMD = "run:";
 const PUT_CMD = "put:";
-const GET_CMD = "get:";
-const QUERY_CMD = "rquery:";
-const RPUSH_CMD = "spush:";
-const RPOP_CMD = "spop:";
-const EVAL_CMD = "reval:";
-const UPDATE_CMD = "update:";
+const TEXT_TYPE = "TEXT";
+const COMMAND_IDLE_WARNING_MS = 120000;
+const INTERACTION_PROMPT = /(?:\[(?:y\s*\/\s*n|y\/n|yes\/no)(?:\s*\])|\(y\/(?:n|N)\)|password\s*:\s*$|passphrase\s*:\s*$|press\s+(?:enter|return)|continue\s*\?\s*(?:\[|\(|$)|\[sudo\]\s+password\s+for|select\s+(?:an?\s+)?option\s*:?\s*$)/im;
 
 const deploying = [];
 const batches = new Map();
@@ -54,39 +49,6 @@ class ExecuterService extends Service {
   constructor(ctx) {
     super(ctx);
     this.env = "";
-  }
-  getFile(conn, srcFile, distFile) {
-    const env = this.env;
-    return withSftp(conn, (sftp, finish) => {
-        let now = Date.now();
-        // 下载文件
-        sftp.fastGet(
-          srcFile,
-          distFile,
-          {
-            step(transferred, chunk, total) {
-              if (Date.now() - now > 1000 || transferred >= total) {
-                now = Date.now();
-                broadcast.cast(
-                  `INFO:[${conn.host}] 进度:${(
-                    (transferred * 100) /
-                    total
-                  ).toFixed(2)}%`,
-                  env
-                );
-              }
-            },
-          },
-          function (err) {
-            if (err) {
-              broadcast.cast(`ERR:[${conn.host}] ${err.message}`, env);
-              return finish(err);
-            }
-            broadcast.cast(`INFO:[${conn.host}] 文件下载成功`, env);
-            finish();
-          }
-        );
-    });
   }
   putFile(conn, srcFile, distFile) {
     const env = this.env;
@@ -124,61 +86,74 @@ class ExecuterService extends Service {
   execute(conn, cmd) {
     const env = this.env;
     return new Promise((resolve, reject) => {
-      let buffer = "";
-      conn.exec(cmd, function (err, stream) {
-        if (err) return reject(err);
+      let stream;
+      let stdoutBuffer = '';
+      let stderrBuffer = '';
+      let lastStderr = '';
+      let idleTimer;
+      let settled = false;
+      let interactionWarningSent = false;
+      const idleWarningMs = this.commandIdleWarningMs || COMMAND_IDLE_WARNING_MS;
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(idleTimer);
+        if (error) reject(error);
+        else resolve();
+      };
+      const output = (channel, data, final = false) => {
+        const previous = channel === 'stderr' ? stderrBuffer : stdoutBuffer;
+        const normalized = `${previous}${data ? data.toString() : ''}`.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        if (!interactionWarningSent && INTERACTION_PROMPT.test(normalized)) {
+          interactionWarningSent = true;
+          broadcast.cast(`WARN:[${conn.host}] 检测到命令可能正在等待交互输入。部署日志不支持输入应答；请使用非交互参数，或取消该服务器的部署。`, env);
+        }
+        const lines = normalized.split('\n');
+        const remaining = final ? '' : lines.pop();
+        if (channel === 'stderr') stderrBuffer = remaining;
+        else stdoutBuffer = remaining;
+        for (const line of lines) {
+          if (!line) continue;
+          if (channel === 'stderr') lastStderr = `${lastStderr}${line}\n`.slice(-2000);
+          broadcast.cast(`INFO:[${conn.host}] ${channel === 'stderr' ? '[stderr] ' : ''}${line}`, env);
+        }
+      };
+      const resetIdleTimer = () => {
+        clearTimeout(idleTimer);
+        if (settled) return;
+        idleTimer = setTimeout(() => {
+          broadcast.cast(`WARN:[${conn.host}] 命令 ${cmd} 已 ${Math.round(idleWarningMs / 1000)} 秒没有输出，仍在运行；如果它正在等待输入，请使用非交互参数或取消此服务器的部署。`, env);
+        }, idleWarningMs);
+      };
+      conn.exec(cmd, function (err, channel) {
+        if (err) return finish(err);
+        stream = channel;
+        resetIdleTimer();
         stream
           .on("close", function (code, signal) {
-            if (buffer) {
-              broadcast.cast(`INFO:[${conn.host}] ${buffer}`, env);
-            }
+            output('stdout', null, true);
+            output('stderr', null, true);
             if (signal || code !== 0) {
-              broadcast.cast(
-                `ERR:[${conn.host}] ${cmd} 执行失败 code:${code} signal:${signal || ''}`,
-                env
-              );
-              reject(new Error(`${cmd} 执行失败 code:${code}`));
+              const reason = `${cmd} 执行失败 code:${code} signal:${signal || ''}${lastStderr ? `\nstderr: ${lastStderr.trim()}` : ''}`;
+              broadcast.cast(`ERR:[${conn.host}] ${reason}`, env);
+              finish(new Error(reason));
             } else {
               broadcast.cast(`NORM:[${conn.host}] ${cmd} 完成`, env);
-              resolve();
+              finish();
             }
           })
           .on("data", function (data) {
-            buffer += data.toString();
-            if (buffer.includes("\n")) {
-              const arr = buffer.split("\n");
-              arr
-                .slice(0, -1)
-                .map((l) => broadcast.cast(`INFO:[${conn.host}] ${l}`, env));
-              buffer = arr[arr.length - 1];
-            }
+            resetIdleTimer();
+            output('stdout', data);
           })
-          .stderr.on("data", function (data) {
-            broadcast.cast(`ERR:[${conn.host}] ${data}`, env);
-          });
+          .on('error', finish);
+        stream.stderr.on("data", function (data) {
+          resetIdleTimer();
+          output('stderr', data);
+        });
       });
     });
   }
-  query(conn, cmd) {
-    const env = this.env;
-    return new Promise((resolve, reject) => {
-      const result = [];
-      conn.exec(cmd, function (err, stream) {
-        if (err) return reject(err);
-        stream
-          .on("close", function (code, signal) {
-            resolve(result.join(""));
-          })
-          .on("data", function (data) {
-            result.push(data);
-          })
-          .stderr.on("data", function (data) {
-            broadcast.cast(`ERR:[${conn.host}] ${data}`, env);
-          });
-      });
-    });
-  }
-
   resolveExpress(scriptContent, from) {
     const files = this.content.files;
     const vars = this.content.vars;
@@ -193,63 +168,71 @@ class ExecuterService extends Service {
       return candidate.startsWith(`${path.resolve(base)}${path.sep}`) ? candidate : null;
     };
     // 替换文件路径、服务器名字、配置（并更换配置里面的东西）
-    const dynamics = scriptContent.match(regExp);
+    const dynamics = [...scriptContent.matchAll(regExp)];
     if (dynamics) {
       const map = dynamics.reduce((ret, item) => {
-        const arr = item.split(":");
-        const key = arr[0].slice(1);
-        const value = arr[1].slice(0, -1).trim();
+        const token = item[0];
+        const key = item[1];
+        const value = item[2].trim();
         if (key === CFG_TYPE) {
           if (from[value]) {
-            ret[item] = { err: `配置[${value}]内有循环引用` };
+            ret[token] = { err: `配置[${value}]内有循环引用` };
           } else {
             const filePath = contained(configDir, value);
-            if (!filePath) { ret[item] = { err: `配置[${value}]名称无效` }; return ret; }
+            if (!filePath) { ret[token] = { err: `配置[${value}]名称无效` }; return ret; }
             const configContent = fs.readFileSync(filePath, "utf-8");
             if (configContent) {
               from[value] = 1;
               const the = this.resolveExpress(configContent, from);
               if (the.err) {
-                ret[item] = the;
+                ret[token] = the;
               } else {
                 if (configContent === the.data) {
-                  ret[item] = { data: filePath };
+                  ret[token] = { data: filePath };
                 } else {
                   const now = dayjs();
                   const time = now.format("YYYYMMDD-HH:mm:ss");
                   const newPath = path.resolve(tempDir, `${time}~${value}`);
                   fs.writeFileSync(newPath, the.data, "utf-8");
-                  ret[item] = { data: newPath };
+                  ret[token] = { data: newPath };
                 }
               }
             } else {
-              ret[item] = { err: `配置[${value}]不存在` };
+              ret[token] = { err: `配置[${value}]不存在` };
             }
           }
         } else if (key === HOST_TYPE) {
           if (hosts[value]) {
-            ret[item] = { data: hosts[value].host };
+            ret[token] = { data: hosts[value].host };
           } else if (value === "$SELF") {
-            ret[item] = { data: server.host };
+            ret[token] = { data: server.host };
           } else {
-            ret[item] = { err: `服务器[${value}]不存在` };
+            ret[token] = { err: `服务器[${value}]不存在` };
           }
         } else if (key === FILE_TYPE) {
           const filename = files[value];
           const filePath = contained(fileDir, filename);
-          if (filePath && fs.existsSync(filePath)) {
-            ret[item] = { data: filePath };
+          if (filePath && fs.existsSync(filePath) && fs.lstatSync(filePath).isFile()) {
+            ret[token] = { data: filePath };
           } else {
-            ret[item] = { err: `文件[${filename}]找不到` };
+            ret[token] = { err: `文件[${filename}]找不到` };
           }
         } else if (key === VAR_TYPE) {
           if (vars[value]) {
-            ret[item] = { data: vars[value] };
+            ret[token] = { data: vars[value] };
           } else {
-            ret[item] = { err: `变量[${value}]找不到` };
+            ret[token] = { err: `变量[${value}]找不到` };
+          }
+        } else if (key === TEXT_TYPE) {
+          if (!Object.prototype.hasOwnProperty.call(this.content.texts || {}, value) ||
+              typeof this.content.texts[value] !== 'string' ||
+              this.content.texts[value].length > 4096 || /[\r\n\0]/.test(this.content.texts[value])) {
+            ret[token] = { err: `参数[${value}]未填写` };
+          } else {
+            ret[token] = { data: this.content.texts[value] };
           }
         } else {
-          ret[item] = { err: `变量[${key}]不支持` };
+          ret[token] = { err: `变量[${key}]不支持` };
         }
         return ret;
       }, {});
@@ -257,31 +240,33 @@ class ExecuterService extends Service {
       if (errors.length) {
         return { err: errors.map((item) => item.err).join(",") };
       }
-      scriptContent = scriptContent.replace(regExp, ($1) => {
-        return map[$1].data;
+      scriptContent = scriptContent.replace(regExp, token => {
+        return map[token].data;
       });
     }
     return { data: scriptContent };
   }
-  cmdEval(script, register) {
-    let fun = funMap[script];
-    if (!fun) {
-      fun = funMap[script] = new Function("$", `return ${script}`);
+  validateCommands(commands) {
+    const allowedRoots = [ this.content.fileDir, this.content.configDir, this.content.tempDir ]
+      .filter(Boolean).map(root => fs.realpathSync(path.resolve(root)));
+    for (const command of commands) {
+      const line = command.trim();
+      if (!line || line.startsWith('#')) continue;
+      const match = /^(put|run):\s*(.*)$/s.exec(line);
+      if (!match || !match[2].trim()) return `不支持的部署命令：${line.split(':', 1)[0] || line}`;
+      if (match[1] !== 'put') continue;
+      const paths = match[2].split(',');
+      if (paths.length !== 2 || !paths[0].trim() || !paths[1].trim()) return 'put 命令格式应为 put: [FILE:文件名],远程路径';
+      const source = path.resolve(paths[0].trim());
+      let resolvedSource;
+      try {
+        const stat = fs.lstatSync(source);
+        if (!stat.isFile() || stat.isSymbolicLink()) return 'put 来源必须是当前环境目录中的普通文件';
+        resolvedSource = fs.realpathSync(source);
+      } catch { return 'put 来源文件不存在'; }
+      if (!allowedRoots.some(root => resolvedSource.startsWith(`${root}${path.sep}`))) return 'put 来源必须位于当前环境 files、configs 或 temp 目录中';
     }
-    return fun(register);
-  }
-
-  // "AAAA$[0],$[1]"
-  resolveStack(cmd, stack) {
-    return cmd.replace(/\$\[(\d+?)\]/g, ($0, $1) => {
-      return stack[stack.length - 1 - $1] || "";
-    });
-  }
-  updateVars(item) {
-    const vars = utils.parseVars();
-    const arr = item.split("=");
-    vars[arr[0]] = arr[1];
-    utils.saveVars(vars);
+    return null;
   }
 
   // list:[{name:string,host:string,cmds:string[]}],cmds是文件名字
@@ -315,7 +300,10 @@ class ExecuterService extends Service {
             .filter((line) => !line.trim().startsWith("#"))
         );
       }
-      return { server, cmds: cmds.filter((cmd) => cmd) };
+      const filtered = cmds.filter(cmd => cmd && !cmd.trim().startsWith('#')).map(cmd => cmd.trim());
+      const commandError = this.validateCommands(filtered);
+      if (commandError) return { err: `第${index + 1}个部署项：${commandError}` };
+      return { server, cmds: filtered };
     });
   }
   /** 直接提供给其他那里调用的，直接输入的cmd，而非cmd文件
@@ -349,7 +337,10 @@ class ExecuterService extends Service {
             .filter((line) => !line.trim().startsWith("#"))
         );
       }
-      return { server, cmds: cmds.filter((cmd) => cmd) };
+      const filtered = cmds.filter(cmd => cmd && !cmd.trim().startsWith('#')).map(cmd => cmd.trim());
+      const commandError = this.validateCommands(filtered);
+      if (commandError) return { err: `第${index + 1}个配置：${commandError}` };
+      return { server, cmds: filtered };
     });
   }
   
@@ -433,7 +424,8 @@ class ExecuterService extends Service {
   }
 
   async deply(item) {
-    const errors = [];
+    const commandError = this.validateCommands(item.cmds || []);
+    if (commandError) throw new Error(commandError);
     const host = item.server.host;
     const password = item.server.password;
     const port = item.server.port || 22
@@ -441,59 +433,14 @@ class ExecuterService extends Service {
     const conn = connect.conn;
     try {
       await Promise.race([connect.waitReady, connect.cancelled]);
-      const stack = [];
-      let register;
       for (let i = 0; i < item.cmds.length; ++i) {
         const cmd = item.cmds[i];
         broadcast.cast(`NORM:[${conn.host}] ${cmd}`, this.env);
         if (cmd.startsWith(PUT_CMD)) {
-          const desc = this.resolveStack(
-            cmd.slice(PUT_CMD.length).trim(),
-            stack,
-            host
-          );
-          const paths = desc.split(",");
+          const paths = cmd.slice(PUT_CMD.length).trim().split(",");
           await Promise.race([this.putFile(conn, paths[0], paths[1]), connect.cancelled]);
-        } else if (cmd.startsWith(GET_CMD)) {
-          const desc = this.resolveStack(
-            cmd.slice(GET_CMD.length).trim(),
-            stack,
-            host
-          );
-          const paths = desc.split(",");
-          await Promise.race([this.getFile(conn, paths[0], paths[1]), connect.cancelled]);
         } else if (cmd.startsWith(RUN_CMD)) {
-          const desc = this.resolveStack(
-            cmd.slice(RUN_CMD.length).trim(),
-            stack,
-            host
-          );
-          await Promise.race([this.execute(conn, desc), connect.cancelled]);
-        } else if (cmd.startsWith(QUERY_CMD)) {
-          const desc = this.resolveStack(
-            cmd.slice(QUERY_CMD.length).trim(),
-            stack,
-            host
-          );
-          register = await Promise.race([this.query(conn, desc), connect.cancelled]);
-        } else if (cmd.startsWith(RPUSH_CMD)) {
-          stack.push(register);
-        } else if (cmd.startsWith(RPOP_CMD)) {
-          register = stack.pop();
-        } else if (cmd.startsWith(EVAL_CMD)) {
-          const desc = this.resolveStack(
-            cmd.slice(EVAL_CMD.length).trim(),
-            stack,
-            host
-          );
-          register = this.cmdEval(desc, register);
-        } else if (cmd.startsWith(UPDATE_CMD)) {
-          const desc = this.resolveStack(
-            cmd.slice(UPDATE_CMD.length).trim(),
-            stack,
-            host
-          );
-          this.updateVars(desc);
+          await Promise.race([this.execute(conn, cmd.slice(RUN_CMD.length).trim()), connect.cancelled]);
         }
         connect.record();
       }
@@ -518,14 +465,23 @@ class ExecuterService extends Service {
     for (const host of groups.keys()) {
       if (batches.has(key(host)) || deploying.some(x => x.env === this.env && x.host === host && x.using)) throw new Error(`${host} 正在部署，请稍后重试`);
     }
-    for (const host of groups.keys()) batches.set(key(host), { host, env: this.env, cancelled: false });
+    for (const [ host, items ] of groups) {
+      batches.set(key(host), {
+        host,
+        env: this.env,
+        items,
+        currentIndex: -1,
+        cancelled: false,
+      });
+    }
     const failures = [];
     await Promise.all([...groups].map(async ([host, items]) => {
       const batch = batches.get(key(host));
       try {
-        for (const item of items) {
+        for (let index = 0; index < items.length; index++) {
           if (batch.cancelled) throw new Error('部署已取消');
-          await this.deply(item);
+          batch.currentIndex = index;
+          await this.deply(items[index]);
         }
       } catch (err) {
         failures.push(`${host}: ${err?.message || '连接中断'}`);
@@ -541,6 +497,23 @@ class ExecuterService extends Service {
 
   getDeployings(env) {
     return [...new Set([...deploying.filter(item => item.env === env && item.using), ...[...batches.values()].filter(item => item.env === env)].map(item => item.host))];
+  }
+  getDeploymentStatuses(env) {
+    return [...batches.values()]
+      .filter(batch => batch.env === env)
+      .map(batch => {
+        const queuedItems = batch.currentIndex < 0
+          ? batch.items
+          : batch.items.slice(batch.currentIndex + 1);
+        const currentItem = batch.currentIndex < 0 ? null : batch.items[batch.currentIndex];
+        return {
+          host: batch.host,
+          status: currentItem ? 'deploying' : 'queued',
+          currentItem: currentItem?.name || null,
+          queuedItems: queuedItems.length,
+          queuedNames: queuedItems.map(item => item.name || item.host),
+        };
+      });
   }
   stopDeploy(host, env) {
     const batch = batches.get(`${env}:${host}`);

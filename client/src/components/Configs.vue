@@ -4,7 +4,7 @@
       <el-collapse-item title="点击新增" name="1">
         <div class="panel">
           <el-alert
-            title="配置文件内可以有[HOST:]和[CONF:]，但是不可以有[FILE:]，因为文件是动态选择的"
+            title="配置文件支持 [HOST:]、[CONF:]、[VAR:] 和 [TEXT:] 参数；[TEXT:] 在发布确认时填写"
             type="warning"
           />
           <el-form ref="formRef" :model="form" label-width="120px">
@@ -33,11 +33,12 @@
       </template>
       <el-table :data="list" style="width: 100%">
         <el-table-column prop="name" label="配置名字"><template #default="scope">{{ scope.row.name }} <el-tooltip v-if="scope.row.note" :content="scope.row.note"><span class="note-icon">?</span></el-tooltip></template></el-table-column>
-        <el-table-column label="操作" width="120">
+        <el-table-column label="操作" width="190">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="edit(scope.row)"
               >修改</el-button
             >
+            <el-button link type="primary" size="small" @click="openClone(scope.row)">克隆</el-button>
             <el-button link type="primary" size="small" @click="del(scope.row)"
               >删除</el-button
             >
@@ -45,6 +46,7 @@
         </el-table-column>
       </el-table>
     </el-card>
+    <ResourceCloneDialog v-model="cloneVisible" resource-type="config" :resource-name="cloneName" @cloned="fresh" />
   </div>
 </template>
 
@@ -52,8 +54,10 @@
 import { ElMessage } from "element-plus";
 import { deleteConfig, fetchConfig, fetchConfigs, saveConfig } from "../api";
 import { confirmDelete } from "../utils";
+import ResourceCloneDialog from './ResourceCloneDialog.vue';
 export default {
   name: "configs",
+  components: { ResourceCloneDialog },
   data() {
     return {
       list: [],
@@ -63,6 +67,8 @@ export default {
         note: "",
       },
       collapse: [],
+      cloneVisible: false,
+      cloneName: '',
     };
   },
   computed: { lineNumbers() { return this.form.data.split('\n').map((_, i) => i + 1).join('\n'); } },
@@ -88,6 +94,7 @@ export default {
       });
       this.collapse = ["1"];
     },
+    openClone(item) { this.cloneName = item.name; this.cloneVisible = true; },
     save() {
       if (!this.form.name) {
         return ElMessage.error("请输入配置名字");

@@ -27,6 +27,55 @@ if (!fs.existsSync(workspaceDir)) {
   fs.mkdirSync(workspaceDir);
 }
 class DeployController extends Controller {
+  resourceDirectory(ctx, env, type) {
+    ctx.assert(['config', 'script'].includes(type), 400, '资源类型无效');
+    access.assertEnv(ctx, env);
+    ctx.assert(database.getDb().prepare('SELECT name FROM environments WHERE name=?').get(env), 404, '环境不存在');
+    const context = config.createContext(env);
+    return type === 'config' ? context.configDir : context.scriptDir;
+  }
+
+  async getResourceNames(ctx) {
+    const { type, targetEnv } = ctx.query;
+    try {
+      const dir = this.resourceDirectory(ctx, targetEnv, type);
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      ctx.body = { data: entries.filter(entry => entry.isFile()).map(entry => ({
+        name: entry.name,
+        note: database.getNote(targetEnv, type, entry.name),
+      })) };
+    } catch (err) {
+      ctx.status = err.status || 500;
+      ctx.body = { message: err.message || '读取目标环境资源失败' };
+    }
+  }
+
+  async cloneResource(ctx) {
+    const { type, name, targetEnv } = ctx.request.body || {};
+    const sourceEnv = ctx.headers.env;
+    try {
+      ctx.assert(typeof name === 'string' && name.length > 0 && name === path.basename(name) && !/[\\/\0]/.test(name), 400, '资源名称无效');
+      ctx.assert(targetEnv !== sourceEnv, 400, '请选择其他目标环境');
+      const sourceDir = this.resourceDirectory(ctx, sourceEnv, type);
+      const targetDir = this.resourceDirectory(ctx, targetEnv, type);
+      const sourcePath = path.join(sourceDir, name);
+      const targetPath = path.join(targetDir, name);
+      const sourceStat = await fs.promises.lstat(sourcePath);
+      ctx.assert(sourceStat.isFile() && !sourceStat.isSymbolicLink(), 400, '只允许克隆普通文件');
+      await fs.promises.copyFile(sourcePath, targetPath, fs.constants.COPYFILE_EXCL);
+      try {
+        database.setNote(targetEnv, type, name, database.getNote(sourceEnv, type, name));
+      } catch (err) {
+        await fs.promises.unlink(targetPath).catch(() => {});
+        throw err;
+      }
+      ctx.body = { data: 'success' };
+    } catch (err) {
+      ctx.status = err.status || (err.code === 'EEXIST' ? 409 : err.code === 'ENOENT' ? 404 : 500);
+      ctx.body = { message: err.code === 'EEXIST' ? `目标环境已存在同名${type === 'config' ? '配置' : '脚本'}，未覆盖` : err.message || '克隆失败' };
+    }
+  }
+
   queryFileStat(filePath) {
     return new Promise((rs, rj) => {
       fs.stat(filePath, (err, stat) => {
@@ -711,10 +760,9 @@ class DeployController extends Controller {
     // 解析脚本：将脚本名转换为命令数组
     const vars = utils.parseVars.call(req.context);
     const env = req.headers.env || 'default';
-    const context = Object.assign(
-      { vars, hosts },
-      req.context
-    );
+    const context = Object.assign({}, req.context, {
+      vars, hosts, files: req.body.files || {}, texts: req.body.texts || {},
+    });
     
     const list = ctx.service.executer.parseSingleCmds(env, context, [{
       host: req.body.server,
@@ -742,6 +790,12 @@ class DeployController extends Controller {
     const env = ctx.headers.env;
     access.assertEnv(ctx, env);
     ctx.body = { data: ctx.service.executer.getDeployings(env) };
+  }
+
+  async getDeploymentStatuses(ctx) {
+    const env = ctx.headers.env;
+    access.assertEnv(ctx, env);
+    ctx.body = { data: ctx.service.executer.getDeploymentStatuses(env) };
   }
 
   // 获取部署
@@ -876,67 +930,30 @@ class DeployController extends Controller {
   }
   // 运行脚本到指定服务器
   async scriptRun(ctx) {
-    const { request: req, response: res } = ctx;
+    const { request: req } = ctx;
     const targetHost = req.body.host;
     const targetScriptName = req.body.cmd;
     const env = req.headers.env;
-    console.log(
-      "服务器名称：",
-      targetHost,
-      "脚本名称：",
-      targetScriptName,
-      "env:",
-      env
-    );
-
-    let serverConfig = "";
+    access.assertEnv(ctx, env);
     try {
-      const hostsFilePath = path.resolve(req.context.hostsFile);
-      const hostsData = await readFile(hostsFilePath, "utf-8");
-      const hostsJson = JSON.parse(hostsData);
-      serverConfig = hostsJson[targetHost];
-      if (!serverConfig) {
-        ctx.body = { err: `未找到服务器配置: ${targetHost}` };
-        return;
-      }
+      ctx.assert(typeof targetScriptName === 'string' && targetScriptName && !/[\\/\0]/.test(targetScriptName), 400, '脚本名称无效');
+      const scriptPath = path.join(req.context.scriptDir, targetScriptName);
+      const scriptData = await readFile(scriptPath, 'utf8');
+      const hosts = utils.parseHosts.call(req.context);
+      const parsed = ctx.service.executer.parseSingleCmds(env, {
+        ...req.context,
+        vars: utils.parseVars.call(req.context),
+        hosts,
+        files: req.body.files || {},
+        texts: req.body.texts || {},
+      }, [{ host: targetHost, cmds: [scriptData] }]);
+      ctx.assert(!parsed[0]?.err, 400, parsed[0]?.err || '脚本解析失败');
+      await ctx.service.executer.deployList(parsed);
+      ctx.body = { data: 'success' };
     } catch (err) {
-      console.error("读取服务器列表文件失败：", err);
-      ctx.body = { err: "服务器配置读取失败" };
-      return;
+      ctx.status = err.status || 400;
+      ctx.body = { message: err.message || '脚本执行失败' };
     }
-    const [host, password, port] = serverConfig.split(":");
-    // 读取脚本文件的内容
-    let scriptData;
-    try {
-      const scriptFilePath = path.resolve(
-        req.context.scriptDir,
-        targetScriptName
-      );
-      scriptData = await readFile(scriptFilePath, "utf-8");
-    } catch (err) {
-      console.error("读取脚本文件失败：", err);
-      ctx.body = { err: "脚本读取失败" };
-      return;
-    }
-
-    // 构造服务器对象
-    const server = {
-      host,
-      password,
-      port
-    };
-    const finalScript = utils.parseVars.call(scriptData);
-
-    // 调用封装好的执行方法
-    try {
-      await ctx.service.executer.run(server, finalScript);
-      ctx.body = { data: "success" };
-    } catch (err) {
-      console.error("脚本执行失败：", err);
-      ctx.body = { err: "脚本执行失败" };
-    }
-
-    ctx.body = { data: "sccess" };
   }
 
   // 检测脚本在哪些部署编排中被使用

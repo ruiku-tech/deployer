@@ -1,7 +1,7 @@
 import service from "./base";
 
-export function deploy(list, env, files, runAt) {
-  return service.post("/deploy", { list, env, files, runAt });
+export function deploy(list, env, files, texts, runAt) {
+  return service.post("/deploy", { list, env, files, texts, runAt });
 }
 export function fetchSchedules() { return service.get('/schedules', { headers: { nofeel: true } }); }
 export function cancelSchedule(id) { return service.post('/schedule/cancel', { id }); }
@@ -17,6 +17,10 @@ export function APIGetHistoryScript() {
 
 export function getDeployings() {
   return service.get("/deployings", { headers: { nofeel: true } });
+}
+
+export function getDeploymentStatuses() {
+  return service.get('/deployment-statuses', { headers: { nofeel: true } });
 }
 
 export function stopDeploy(host) {

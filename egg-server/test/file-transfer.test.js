@@ -16,6 +16,7 @@ global.isTest = true;
 
 const database = require('../app/service/database');
 const Executer = require('../app/service/executer');
+const broadcast = require('../app/service/broadcast');
 const DeployController = require('../app/controller/deploy');
 const config = require('../app/service/config');
 const multipartContext = require('../node_modules/egg-multipart/app/extend/context');
@@ -29,7 +30,6 @@ function fakeConnection(fail) {
   sftp.closed = 0;
   sftp.end = () => { sftp.closed++; };
   sftp.fastPut = (src, dest, options, callback) => setImmediate(() => callback(fail));
-  sftp.fastGet = (src, dest, options, callback) => setImmediate(() => callback(fail));
   return { host: 'test-host', sftp: callback => callback(null, sftp), sftpChannel: sftp };
 }
 
@@ -68,17 +68,76 @@ test.after(() => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('SFTP channels close after successful and failed uploads and downloads', async () => {
+test('SFTP upload channels close after success and failure', async () => {
   const service = Object.create(Executer.prototype);
   service.env = 'testing';
-  for (const operation of ['putFile', 'getFile']) {
-    const success = fakeConnection(null);
-    await service[operation](success, '/source', '/target');
-    assert.equal(success.sftpChannel.closed, 1);
+  const success = fakeConnection(null);
+  await service.putFile(success, '/source', '/target');
+  assert.equal(success.sftpChannel.closed, 1);
 
-    const failure = fakeConnection(new Error('transfer failed'));
-    await assert.rejects(service[operation](failure, '/source', '/target'), /transfer failed/);
-    assert.equal(failure.sftpChannel.closed, 1);
+  const failure = fakeConnection(new Error('transfer failed'));
+  await assert.rejects(service.putFile(failure, '/source', '/target'), /transfer failed/);
+  assert.equal(failure.sftpChannel.closed, 1);
+  assert.equal(service.getFile, undefined);
+  assert.equal(service.query, undefined);
+  assert.equal(service.cmdEval, undefined);
+});
+
+test('SSH stderr is informational; only nonzero exits are errors, and interactive commands are warned without auto-kill', async () => {
+  const service = Object.create(Executer.prototype);
+  service.env = 'testing';
+  const originalCast = broadcast.cast;
+  const logs = [];
+  broadcast.cast = message => logs.push(message);
+  const stream = new EventEmitter();
+  stream.stderr = new EventEmitter();
+  stream.signal = signal => { stream.sentSignals = [...(stream.sentSignals || []), signal]; };
+  const conn = { host: 'test-host', exec: (cmd, callback) => callback(null, stream), destroy() { this.destroyed = true; } };
+  try {
+    const successful = service.execute(conn, 'docker pull image');
+    stream.stderr.emit('data', Buffer.from('Pulling from library/image\n'));
+    stream.emit('close', 0, undefined);
+    await successful;
+    assert.ok(logs.some(line => line.startsWith('INFO:[test-host] [stderr] Pulling')));
+    assert.ok(logs.some(line => line.startsWith('NORM:[test-host]')));
+    assert.equal(logs.some(line => line.startsWith('ERR:')), false);
+
+    logs.length = 0;
+    const failed = service.execute(conn, 'docker run bad-image');
+    stream.stderr.emit('data', Buffer.from('image not found\n'));
+    stream.emit('close', 1, undefined);
+    await assert.rejects(failed, /执行失败 code:1/);
+    assert.ok(logs.some(line => line.startsWith('INFO:[test-host] [stderr] image not found')));
+    assert.ok(logs.some(line => line.startsWith('ERR:[test-host]')));
+
+    logs.length = 0;
+    const idleService = Object.create(Executer.prototype);
+    idleService.env = 'testing';
+    idleService.commandIdleWarningMs = 5;
+    const idleStream = new EventEmitter();
+    idleStream.stderr = new EventEmitter();
+    idleStream.signal = signal => {
+      idleStream.sentSignals = [...(idleStream.sentSignals || []), signal];
+    };
+    const pending = idleService.execute({ ...conn, exec: (cmd, callback) => callback(null, idleStream) }, 'long-running task');
+    await new Promise(resolve => setTimeout(resolve, 15));
+    assert.deepEqual(idleStream.sentSignals || [], []);
+    assert.ok(logs.some(line => line.startsWith('WARN:') && /仍在运行/.test(line)));
+    idleStream.emit('close', 0, undefined);
+    await pending;
+
+    logs.length = 0;
+    const promptStream = new EventEmitter();
+    promptStream.stderr = new EventEmitter();
+    promptStream.signal = signal => { promptStream.sentSignals = [...(promptStream.sentSignals || []), signal]; };
+    const prompted = idleService.execute({ ...conn, exec: (cmd, callback) => callback(null, promptStream) }, 'apt-get install package');
+    promptStream.stderr.emit('data', Buffer.from('Continue? [Y/n]'));
+    assert.ok(logs.some(line => line.startsWith('WARN:') && /等待交互输入/.test(line)));
+    assert.deepEqual(promptStream.sentSignals || [], []);
+    promptStream.emit('close', 0, undefined);
+    await prompted;
+  } finally {
+    broadcast.cast = originalCast;
   }
 });
 
@@ -110,7 +169,10 @@ test('reused SSH connections release limited channels and failures force a fresh
   }, { filename });
   const service = Object.create(module.exports.prototype);
   service.env = 'testing';
-  const item = { server: { host: 'test-host', password: 'password' }, cmds: ['put:/source,/target'] };
+  service.content = { fileDir: context.fileDir };
+  const sourcePath = path.join(context.fileDir, 'source.bin');
+  fs.writeFileSync(sourcePath, 'package');
+  const item = { server: { host: 'test-host', password: 'password' }, cmds: [`put:${sourcePath},/target`] };
   try {
     for (let i = 0; i < 15; i++) await service.deply(item);
     assert.equal(instances.length, 1);
@@ -121,7 +183,10 @@ test('reused SSH connections release limited channels and failures force a fresh
     await service.deply(item);
     assert.equal(instances.length, 2);
     assert.equal(instances[1].active, 0);
-  } finally { service.stopDeploy('test-host', 'testing'); }
+  } finally {
+    service.stopDeploy('test-host', 'testing');
+    fs.unlinkSync(sourcePath);
+  }
 });
 
 test('completed uploads appear under a unique final name and unfinished uploads leave no file', async () => {

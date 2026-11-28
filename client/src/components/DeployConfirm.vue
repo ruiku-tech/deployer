@@ -20,6 +20,14 @@
           </el-form-item>
         </el-form>
       </section>
+      <section v-if="form.texts.length" class="text-section">
+        <h3>运行时参数</h3>
+        <el-form :model="form" label-position="top">
+          <el-form-item v-for="item in form.texts" :key="item.name" :label="item.name" required>
+            <el-input v-model="item.value" :placeholder="item.name" clearable />
+          </el-form-item>
+        </el-form>
+      </section>
       <section class="schedule-section">
         <div><h3>发布时间</h3><p>留空立即发布，也可以选择未来的时间定时发布</p></div>
         <el-date-picker v-model="runAt" type="datetime" placeholder="留空立即发布" :disabled-date="disabledDate" />
@@ -34,7 +42,7 @@
 
 <script>
 import { ElMessage } from "element-plus";
-import { deploy, fetchFilesStat, fetchScript } from "../api";
+import { deploy, fetchConfig, fetchFilesStat, fetchScript } from "../api";
 import { prodConfirm } from "../utils";
 import dataCenter from "../dataCenter";
 
@@ -43,7 +51,7 @@ export default {
   props: { list: { type: Array, required: true } },
   emits: ["close"],
   data() {
-    return { fileOptions: [], details: [], form: { files: [] }, runAt: null, loading: true, submitting: false, loadError: "" };
+    return { fileOptions: [], details: [], form: { files: [], texts: [] }, runAt: null, loading: true, submitting: false, loadError: "" };
   },
   mounted() { this.init(); },
   methods: {
@@ -57,11 +65,24 @@ export default {
         this.fileOptions = files.sort((a, b) => b.file.localeCompare(a.file));
         this.details = this.list.map((item, index) => ({ name: item.name, host: item.host, cmd: scripts[index] }));
         // A file variable may be referenced repeatedly across deployment items.
-        const names = new Set();
-        scripts.flat().forEach(script => {
-          for (const match of script.matchAll(/\[FILE:(.+?)\]/g)) names.add(match[1]);
-        });
-        this.form.files = [...names].map(name => ({ name, value: "" }));
+        const fileNames = new Set();
+        const textNames = new Set();
+        const inspectedConfigs = new Set();
+        const inspect = async script => {
+          for (const match of script.matchAll(/\[(FILE|TEXT|CONF):\s*([^\]]+?)\]/g)) {
+            const [, type, rawName] = match;
+            const name = rawName.trim();
+            if (type === 'FILE') fileNames.add(name);
+            if (type === 'TEXT') textNames.add(name);
+            if (type === 'CONF' && !inspectedConfigs.has(name)) {
+              inspectedConfigs.add(name);
+              await inspect(await fetchConfig(name));
+            }
+          }
+        };
+        await Promise.all(scripts.flat().map(inspect));
+        this.form.files = [...fileNames].map(name => ({ name, value: "" }));
+        this.form.texts = [...textNames].map(name => ({ name, value: "" }));
       } catch {
         this.loadError = "加载发布信息失败，请关闭弹窗后重试";
       } finally { this.loading = false; }
@@ -72,14 +93,17 @@ export default {
       if (this.loading || this.loadError || this.submitting) return;
       const empty = this.form.files.filter(item => !item.value);
       if (empty.length) return ElMessage.error(`请选择文件：${empty.map(item => item.name).join("、")}`);
+      const emptyTexts = this.form.texts.filter(item => !item.value.trim());
+      if (emptyTexts.length) return ElMessage.error(`请填写运行时参数：${emptyTexts.map(item => item.name).join("、")}`);
       const timestamp = this.runAt ? this.runAt.getTime() : undefined;
       if (this.runAt && (!Number.isFinite(timestamp) || timestamp <= Date.now())) return ElMessage.error("请选择未来的发布时间");
       const files = Object.fromEntries(this.form.files.map(item => [item.name, item.value]));
+      const texts = Object.fromEntries(this.form.texts.map(item => [item.name, item.value]));
       this.submitting = true;
       try {
         await prodConfirm();
         if (timestamp && timestamp <= Date.now()) return ElMessage.error("所选发布时间已过，请重新选择");
-        await deploy(this.list, dataCenter.env.value, files, timestamp);
+        await deploy(this.list, dataCenter.env.value, files, texts, timestamp);
         this.close();
       } catch { /* Cancellation is expected; API errors are shown by the interceptor. */ }
       finally { this.submitting = false; }
@@ -98,6 +122,7 @@ export default {
 .command-heading strong { color: #334155; font-weight: 500; }.command-heading span { color: #64748b; font-size: 12px; }
 .command-code { box-sizing: border-box; margin: 0; padding: 14px 16px; border-top: 1px solid #334155; background: #1e293b; color: #e2e8f0; font: 12px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre; overflow-x: auto; tab-size: 4; }
 .file-section { margin-top: 24px; }h3 { margin: 0 0 14px; font-size: 14px; color: #334155; font-weight: 600; }
+.text-section { margin-top: 24px; }
 .file-field, .file-select { width: 100%; min-width: 0; }
 .file-memo { margin-top: 8px; padding: 12px 14px; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0; line-height: 1.6; }
 .memo-label { font-size: 12px; color: #64748b; }.file-memo p { margin: 4px 0 0; color: #475569; white-space: pre-wrap; overflow-wrap: anywhere; }

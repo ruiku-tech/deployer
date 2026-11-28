@@ -72,6 +72,8 @@ module.exports = (app) => {
     deployMiddle,
     controller.deploy.postConfig
   );
+  router.get('/deploy/resource/names', auth, controller.deploy.getResourceNames);
+  router.post('/deploy/resource/clone', auth, controller.deploy.cloneResource);
   // 删除配置
   router.delete(
     "/deploy/config",
@@ -170,6 +172,7 @@ module.exports = (app) => {
 
   // 获取正在部署的
   router.get("/deploy/deployings", auth, controller.deploy.getDeployings);
+  router.get('/deploy/deployment-statuses', auth, controller.deploy.getDeploymentStatuses);
 
   // 获取部署
   router.delete(
